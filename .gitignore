@@ -1,0 +1,12 @@
+# Built executables and release outputs
+/fapi
+*.exe
+/dist/
+/bin/
+
+# Web UI dependencies (web/.gitignore has the rest)
+node_modules/
+
+# Local data used while developing
+/testdata/
+/internal_docs/

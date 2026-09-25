@@ -1,0 +1,78 @@
+# Checks each release: Go formatting, vet and staticcheck on Linux and
+# Windows (the systems fapi is released for), and the web UI's type check and
+# build. It runs when a version tag such as v1.2.3 is pushed, alongside the
+# Release workflow, rather than on every push.
+name: CI
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  go:
+    strategy:
+      # Let every OS finish, so one failure doesn't cancel (and hide) the rest.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        # bash on every OS, so a failing line in a multi-line step fails it.
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        if: runner.os == 'Linux'
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Run gofmt -w on these files:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      # Each edition is checked, since build tags change which files compile:
+      # fapi (both UIs), fapi-web (-tags notui) and fapi-cli (-tags nowebui).
+      - name: go vet
+        run: |
+          go vet ./...
+          go vet -tags notui ./...
+          go vet -tags nowebui ./...
+
+      # staticcheck is pinned: each release needs a minimum Go version, and
+      # v0.7.0 is the newest that runs on the Go in go.mod (1.25). Move it
+      # up when go.mod moves up (v0.8.0 needs Go 1.26).
+      - name: staticcheck
+        if: runner.os == 'Linux'
+        run: |
+          go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
+          go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 -tags notui ./...
+          go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 -tags nowebui ./...
+
+      # Also proves fapi builds before the web UI is built.
+      - name: go build
+        run: |
+          go build -o fapi-both ./cmd/fapi
+          go build -tags notui -o fapi-web ./cmd/fapi
+          go build -tags nowebui -o fapi-cli ./cmd/fapi
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build

@@ -1,0 +1,15 @@
+{
+  "adminPort": 3100,
+  "listenAddress": "127.0.0.1",
+  "mockPorts": { "min": 1024, "max": 65535, "default": 3001 },
+  "features": {
+    "webUi": true,
+    "passThrough": true,
+    "cors": true,
+    "requestLog": true,
+    "requestLogPersistence": false,
+    "liveUpdates": true
+  },
+  "requestLog": { "maxEntries": 200, "maxBodyBytes": 4096 },
+  "passThrough": { "host": "localhost" }
+}

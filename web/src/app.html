@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="text-scale" content="scale" />
+		<script>
+			// Follow the operating system's light or dark setting, now and when
+			// it changes. The components' dark styles apply under class="dark".
+			const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+			const applyTheme = () => document.documentElement.classList.toggle('dark', darkQuery.matches);
+			applyTheme();
+			darkQuery.addEventListener('change', applyTheme);
+		</script>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

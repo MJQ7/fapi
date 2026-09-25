@@ -1,0 +1,165 @@
+# Builds every release output with one command:
+#
+#   goreleaser release --clean              (a tagged release, published)
+#   goreleaser release --snapshot --clean   (everything, locally, into dist/)
+#
+# fapi comes in three editions, built from the same code with Go build tags
+# that leave a UI out (see cmd/fapi/main.go):
+#
+#   fapi       web UI and terminal UI
+#   fapi-web   web UI only       (-tags notui)
+#   fapi-cli   terminal UI only  (-tags nowebui)
+#
+# Every edition has the mock servers and the admin API. Each edition is
+# released for amd64 only, as a Windows .zip holding the .exe, a .deb for
+# Debian/Ubuntu and an .rpm for Fedora/RHEL, plus one Docker image
+# (fapi-web). Other systems, such as macOS or ARM machines, build from
+# source; see "Building from source" in README.md.
+# Docs: https://goreleaser.com/customization/
+version: 2
+
+project_name: fapi
+
+before:
+  hooks:
+    # The web UI is built first, so the fapi and fapi-web builds embed it.
+    - npm --prefix web ci
+    - npm --prefix web run build
+
+builds:
+  - id: fapi
+    main: ./cmd/fapi
+    binary: fapi
+    env:
+      # Pure Go, no C compiler, so every platform builds from any machine.
+      - CGO_ENABLED=0
+    goos: [linux, windows]
+    goarch: [amd64]
+    ldflags:
+      # -s -w make the executable smaller; -X sets the version fapi reports.
+      - -s -w -X main.version={{ .Version }}
+
+  - id: fapi-web
+    main: ./cmd/fapi
+    binary: fapi
+    tags: [notui]
+    env: [CGO_ENABLED=0]
+    goos: [linux, windows]
+    goarch: [amd64]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+  - id: fapi-cli
+    main: ./cmd/fapi
+    binary: fapi
+    tags: [nowebui]
+    env: [CGO_ENABLED=0]
+    goos: [linux, windows]
+    goarch: [amd64]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+# Windows gets a .zip holding the .exe, such as fapi-web_1.2.0_windows_amd64.zip.
+# Linux gets no archive ("none"): its downloads are the .deb and .rpm below.
+archives:
+  - id: fapi
+    ids: [fapi]
+    name_template: 'fapi_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    formats: [none]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+  - id: fapi-web
+    ids: [fapi-web]
+    name_template: 'fapi-web_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    formats: [none]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+  - id: fapi-cli
+    ids: [fapi-cli]
+    name_template: 'fapi-cli_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    formats: [none]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+# One .deb and one .rpm per edition. Each installs fapi to /opt/fapi (with
+# /usr/bin/fapi linked to it) and the fapi systemd service, which it enables
+# and starts. They all install the same files, so only one edition can be
+# installed at a time ("conflicts"). The same scripts serve both formats;
+# they handle the different arguments dpkg and rpm pass them.
+nfpms:
+  - id: fapi
+    ids: [fapi]
+    package_name: fapi
+    conflicts: [fapi-web, fapi-cli]
+    description: An API proxy for testing how a frontend handles API errors (web UI and terminal UI).
+    <<: &package # "&" names these settings; the other editions reuse them with "<<: *package"
+      maintainer: fapi maintainers
+      homepage: https://github.com/MJQ7/fapi
+      license: MIT
+      formats: [deb, rpm]
+      bindir: /opt/fapi
+      contents:
+        # /usr/lib rather than /lib: Fedora refuses packages with files in
+        # /lib (a link to /usr/lib there), and Debian's systemd reads both.
+        - src: packaging/fapi.service
+          dst: /usr/lib/systemd/system/fapi.service
+          file_info:
+            mode: 0644
+        - src: /opt/fapi/fapi
+          dst: /usr/bin/fapi
+          type: symlink
+      scripts:
+        postinstall: packaging/postinstall.sh
+        preremove: packaging/preremove.sh
+        postremove: packaging/postremove.sh
+
+  - id: fapi-web
+    ids: [fapi-web]
+    package_name: fapi-web
+    conflicts: [fapi, fapi-cli]
+    description: An API proxy for testing how a frontend handles API errors (web UI only).
+    <<: *package
+
+  - id: fapi-cli
+    ids: [fapi-cli]
+    package_name: fapi-cli
+    conflicts: [fapi, fapi-web]
+    description: An API proxy for testing how a frontend handles API errors (terminal UI only).
+    <<: *package
+
+# One Docker image for linux/amd64, from the fapi-web
+# edition: a terminal UI can't be used inside a container, but it can be run
+# on the host against the container's admin port. The name defaults to
+# "fapi"; set FAPI_IMAGE to push elsewhere, such as ghcr.io/you/fapi.
+#
+# Images are tagged with the version, and normal releases also with
+# "latest". A pre-release tag such as v1.1.0-rc.1 doesn't move "latest": its
+# template comes out empty, and GoReleaser skips empty tags.
+dockers_v2:
+  - ids: [fapi-web]
+    dockerfile: packaging/Dockerfile
+    images: ['{{ envOrDefault "FAPI_IMAGE" "fapi" }}']
+    tags: ['{{ .Version }}', '{{ if not .Prerelease }}latest{{ end }}']
+    platforms: [linux/amd64]
+    extra_files: [packaging/docker-config.json]
+    labels:
+      org.opencontainers.image.version: '{{ .Version }}'
+      org.opencontainers.image.description: fapi, an API proxy for testing how a frontend handles API errors (web UI edition)
+      org.opencontainers.image.licenses: MIT
+      org.opencontainers.image.source: https://github.com/MJQ7/fapi
+
+# A tag with a pre-release suffix, such as v1.1.0-rc.1, is published as a
+# GitHub pre-release; any other tag is a normal release, marked "latest".
+release:
+  prerelease: auto
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc

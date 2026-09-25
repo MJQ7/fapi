@@ -1,0 +1,18 @@
+[Unit]
+Description=fapi, an API proxy for testing how a frontend handles API errors
+After=network.target
+
+[Service]
+ExecStart=/opt/fapi/fapi serve
+
+# Endpoints, logs and an optional config.json live in /var/lib/fapi, which
+# systemd creates (StateDirectory). DynamicUser runs fapi as a throwaway
+# unprivileged user instead of root.
+Environment=FAPI_DATA_DIR=/var/lib/fapi
+StateDirectory=fapi
+DynamicUser=yes
+
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

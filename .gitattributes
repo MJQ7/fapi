@@ -1,0 +1,3 @@
+# Check out text files with LF line endings on every platform, so gofmt
+# (which expects LF) passes on Windows too.
+* text=auto eol=lf
