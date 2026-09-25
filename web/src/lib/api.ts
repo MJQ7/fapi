@@ -53,6 +53,19 @@ export type LoggedRequest = {
 	mockId?: string;
 	upstream?: number;
 	fromPort: number;
+	/**
+	 * What the sender got back: the real API's answer when proxied, otherwise
+	 * fapi's own. Missing in logs saved by older versions.
+	 */
+	response?: LoggedResponse;
+};
+
+export type LoggedResponse = {
+	contentType: string;
+	body: string;
+	bodyTruncated: boolean;
+	/** Why the real API couldn't be reached, when proxied; fapi then answered 502 and there's no body. */
+	error?: string;
 };
 
 export type Settings = {
@@ -165,7 +178,7 @@ export async function setUpstream(
 }
 
 /** A saved proxy: a fapi port, where its requests are forwarded to, and whether it's on. */
-export type Proxy = { port: number; realAPI: string; enabled: boolean };
+export type Proxy = { port: number; upstreamPort: number; realAPI: string; enabled: boolean };
 
 /**
  * The saved proxies, in port order. defaultHost is passThrough.host in fapi's
@@ -177,6 +190,7 @@ export function listProxies(data: MocksData, defaultHost: string): Proxy[] {
 	return Object.entries(data.upstreams)
 		.map(([port, upstreamPort]) => ({
 			port: Number(port),
+			upstreamPort,
 			realAPI: upstreamURL(hosts[port] || defaultHost, upstreamPort),
 			enabled: !disabled[port]
 		}))
@@ -219,6 +233,28 @@ export function getRequests(): Promise<LoggedRequest[]> {
 
 export async function clearRequests(): Promise<void> {
 	await send('DELETE', '/api/requests');
+}
+
+/** How many requests a port received in one step of a traffic report. */
+export type TrafficCounts = {
+	received: number; // always proxied + sent
+	proxied: number; // forwarded to the real API
+	sent: number; // answered by fapi itself: an endpoint or a CORS preflight
+};
+
+/** The periods a traffic report can cover, in minutes. */
+export type TrafficMinutes = 5 | 15 | 30 | 60;
+
+/** The requests each port received over a period, in 60 equal steps, oldest first. */
+export type TrafficReport = {
+	start: string; // when the first step began
+	stepSeconds: number;
+	ports: Record<string, TrafficCounts[]>; // only the ports that received requests
+};
+
+/** Counts the requests each port received over the last few minutes, for the dashboard. */
+export function getTraffic(minutes: TrafficMinutes): Promise<TrafficReport> {
+	return send<TrafficReport>('GET', `/api/traffic?minutes=${minutes}`);
 }
 
 type RequestWatcher = {

@@ -1,7 +1,8 @@
 <!--
-  The endpoints, with how many requests each one answered. Clicking the count
-  shows those requests under the row. Each endpoint has an on/off switch;
-  an endpoint that's off is kept, but its requests go to the proxy instead.
+  The endpoints, with how many requests each one answered (the Traffic
+  column). Clicking the count shows those requests under the row. Each
+  endpoint has an on/off switch; an endpoint that's off is kept, but its
+  requests go to the proxy instead.
   An endpoint on a port without a proxy that's on is marked with a warning,
   since other requests to its port get a 404.
 -->
@@ -77,7 +78,7 @@
 				<Table.Head>Path</Table.Head>
 				<Table.Head>Status</Table.Head>
 				{#if requests !== null}
-					<Table.Head>Requests</Table.Head>
+					<Table.Head>Traffic</Table.Head>
 				{/if}
 				<Table.Head><span class="sr-only">Actions</span></Table.Head>
 			</Table.Row>
@@ -140,7 +141,7 @@
 			{:else}
 				<Table.Row>
 					<Table.Cell></Table.Cell>
-					<Table.Cell colspan={columnCount} class="text-muted-foreground">No endpoints yet</Table.Cell>
+					<Table.Cell colspan={columnCount - 1} class="text-muted-foreground">No endpoints yet</Table.Cell>
 				</Table.Row>
 			{/each}
 		</Table.Body>

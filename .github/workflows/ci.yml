@@ -1,12 +1,12 @@
-# Checks each release: Go formatting, vet and staticcheck on Linux and
-# Windows (the systems fapi is released for), and the web UI's type check and
-# build. It runs when a version tag such as v1.2.3 is pushed, alongside the
-# Release workflow, rather than on every push.
+# Checks what's merged into master: Go formatting, vet and staticcheck on
+# Linux and Windows (the systems fapi is released for), and the web UI's type
+# check and build. It runs on every push to master, including merges, but not
+# on other branches. Releases are published by the Release workflow.
 name: CI
 
 on:
   push:
-    tags: ['v*']
+    branches: [master]
 
 jobs:
   go:

@@ -66,6 +66,8 @@ func New(fapi *core.Core, version string, shutdown func(), settingsFile string) 
 	mux.HandleFunc("PUT /api/upstreams/{port}", requireFeature(features.PassThrough, "passThrough", a.putUpstream))
 	mux.HandleFunc("PUT /api/upstreams/{port}/enabled", requireFeature(features.PassThrough, "passThrough", a.putUpstreamEnabled))
 
+	mux.HandleFunc("GET /api/traffic", a.getTraffic)
+
 	mux.HandleFunc("GET /api/requests", requireFeature(features.RequestLog, "requestLog", a.getRequests))
 	mux.HandleFunc("DELETE /api/requests", requireFeature(features.RequestLog, "requestLog", a.deleteRequests))
 
