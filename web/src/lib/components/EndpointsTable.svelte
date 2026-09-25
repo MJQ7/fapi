@@ -140,7 +140,7 @@
 			{:else}
 				<Table.Row>
 					<Table.Cell></Table.Cell>
-					<Table.Cell colspan={columnCount} class="text-muted-foreground">No endpoints yet</Table.Cell>
+					<Table.Cell colspan={columnCount - 1} class="text-muted-foreground">No endpoints yet</Table.Cell>
 				</Table.Row>
 			{/each}
 		</Table.Body>

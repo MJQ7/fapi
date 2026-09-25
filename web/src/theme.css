@@ -25,6 +25,7 @@
 :root {
 	--sidebar-width: 16rem;
 	--content-max-width: 80rem; /* the widest a screen's content grows */
+	--wide-content-max-width: 120rem; /* the same, for the dashboard */
 	--page-padding-x: 1rem; /* around a screen's content; wider on larger screens below */
 	--page-padding-y: 2rem;
 	--section-gap: 2rem; /* between a screen's header and cards */
@@ -74,9 +75,9 @@
 	--border: oklch(0.922 0 0);
 	--input: oklch(0.922 0 0);
 	--ring: var(--hero);
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
+	--chart-1: oklch(0.55 0.16 255); /* the dashboard: requests received */
+	--chart-2: oklch(0.6 0.13 165); /* requests proxied */
+	--chart-3: var(--hero); /* requests sent by fapi */
 	--chart-4: oklch(0.371 0 0);
 	--chart-5: oklch(0.269 0 0);
 	--radius: 0.625rem;
@@ -108,9 +109,9 @@
 	--warning: oklch(0.769 0.188 70.08);
 	--border: oklch(1 0 0 / 10%);
 	--input: oklch(1 0 0 / 15%);
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
+	--chart-1: oklch(0.68 0.15 255); /* the dashboard: requests received */
+	--chart-2: oklch(0.72 0.13 165); /* requests proxied */
+	--chart-3: var(--hero); /* requests sent by fapi */
 	--chart-4: oklch(0.371 0 0);
 	--chart-5: oklch(0.269 0 0);
 	--sidebar: oklch(0.18 0 0);

@@ -6,16 +6,14 @@
 
 package main
 
-import "errors"
-
 // tuiIncluded reports whether this build contains the terminal UI.
 const tuiIncluded = false
 
 // tuiUsage is empty: there's no terminal UI to describe.
 const tuiUsage = ""
 
-// runTUI is never called when tuiIncluded is false; it exists so main.go
-// compiles the same way in every edition.
+// runTUI exists so main.go compiles the same way in every edition. main.go
+// checks tuiIncluded first, so it's never called.
 func runTUI() error {
-	return errors.New("this build of fapi doesn't include the terminal UI; use the fapi or fapi-cli edition for it")
+	panic("runTUI called in a build without the terminal UI")
 }

@@ -31,6 +31,21 @@ type LoggedRequest struct {
 	MockID   string `json:"mockId,omitempty"`   // the endpoint that answered, when mocked
 	Upstream int    `json:"upstream,omitempty"` // the real API port, when proxied
 	FromPort int    `json:"fromPort"`           // the sender's port; the address is assumed to be localhost
+
+	// Response is what the client was sent: the real API's answer when
+	// proxied, otherwise fapi's own. It's nil in logs saved by older versions.
+	Response *LoggedResponse `json:"response,omitempty"`
+}
+
+// LoggedResponse is the response to a logged request.
+type LoggedResponse struct {
+	ContentType   string `json:"contentType"`
+	Body          string `json:"body"`
+	BodyTruncated bool   `json:"bodyTruncated"` // cut at the size limit, as for requests
+
+	// Error is why the real API couldn't be reached, for a proxied request.
+	// fapi then answered 502 itself, and there's no body.
+	Error string `json:"error,omitempty"`
 }
 
 // The outcomes a logged request can have.

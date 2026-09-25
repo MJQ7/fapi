@@ -54,7 +54,7 @@ fapi refuses to start, naming the setting at fault, if the override file:
 | `mockPorts.min`, `mockPorts.max` | `1024`, `65535` | The range of ports endpoints and proxies may use. Narrowing it helps with Docker, where ports have to be published in advance. |
 | `mockPorts.default` | `3001` | The fapi port the web UI and terminal UI suggest for a new endpoint or proxy. It must be in the range above. If a file narrows the range without setting it, and 3001 falls outside, the lowest allowed port is used. |
 | `requestLog.maxEntries` | `200` | How many requests the request log keeps. The oldest are dropped first. |
-| `requestLog.maxBodyBytes` | `4096` | Request bodies longer than this many bytes are cut in the request log, and marked with `…`. Forwarded requests are never cut. |
+| `requestLog.maxBodyBytes` | `4096` | Request and response bodies longer than this many bytes are cut in the request log, and marked with `…`. What's sent on is never cut. |
 | `passThrough.host` | `"localhost"` | Host of the real API that unmatched requests are forwarded to, for proxies that don't name their own. A proxy can name its own host (such as `https://api.example.com`) with **The real API is on another host** on the Proxies screen, or the host field in the terminal UI. |
 
 ## Feature flags

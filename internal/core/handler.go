@@ -32,10 +32,15 @@ func (c *Core) handleMockRequest(port int, writer http.ResponseWriter, request *
 	entry := c.newLogEntry(port, request, body)
 	origin := request.Header.Get("Origin")
 
+	// Everything below answers through response, which keeps a copy of the
+	// response for the request log.
+	response := newResponseCapture(writer, c.settings.RequestLog.MaxBodyBytes)
+	writer = response
+
 	if c.settings.Features.CORS && isPreflight(request) {
 		writePreflight(writer, request)
 		log.Printf("[%d] %s %s -> CORS preflight", port, request.Method, request.URL.Path)
-		c.record(entry, OutcomePreflight, http.StatusNoContent)
+		c.record(entry, OutcomePreflight, http.StatusNoContent, response.logged())
 		return
 	}
 
@@ -48,14 +53,19 @@ func (c *Core) handleMockRequest(port int, writer http.ResponseWriter, request *
 		writeMock(writer, *mock)
 		log.Printf("[%d] %s %s -> mocked %d", port, request.Method, request.URL.Path, mock.Status)
 		entry.MockID = mock.ID
-		c.record(entry, OutcomeMocked, mock.Status)
+		c.record(entry, OutcomeMocked, mock.Status, response.logged())
 		return
 	}
 
 	if target.port != 0 {
-		status := c.proxy(port, target, writer, request, body)
+		status, failure := c.proxy(port, target, writer, request, body)
 		entry.Upstream = target.port
-		c.record(entry, OutcomeProxied, status)
+		logged := response.logged()
+		if failure != "" {
+			// Log why, rather than the 502 fapi sent in place of a response.
+			logged = &LoggedResponse{Error: failure}
+		}
+		c.record(entry, OutcomeProxied, status, logged)
 		return
 	}
 
@@ -65,7 +75,7 @@ func (c *Core) handleMockRequest(port int, writer http.ResponseWriter, request *
 	message := fmt.Sprintf("No mock for %s %s", request.Method, request.URL.Path)
 	writeJSON(writer, http.StatusNotFound, map[string]string{"message": message})
 	log.Printf("[%d] %s %s -> no mock found", port, request.Method, request.URL.Path)
-	c.record(entry, OutcomeUnmatched, http.StatusNotFound)
+	c.record(entry, OutcomeUnmatched, http.StatusNotFound, response.logged())
 }
 
 // writeMock sends an endpoint's status and JSON body.
@@ -127,13 +137,17 @@ func (c *Core) newLogEntry(port int, request *http.Request, body []byte) LoggedR
 	return entry
 }
 
-// record completes entry and adds it to the request log, if it's turned on.
-func (c *Core) record(entry LoggedRequest, outcome string, status int) {
+// record counts the request for the dashboard, then completes entry with how
+// it was answered and adds it to the request log, if it's turned on.
+func (c *Core) record(entry LoggedRequest, outcome string, status int, response *LoggedResponse) {
+	c.traffic.add(time.Now(), entry.Port, outcome == OutcomeProxied)
+
 	if !c.settings.Features.RequestLog {
 		return
 	}
 	entry.Outcome = outcome
 	entry.Status = status
+	entry.Response = response
 	c.requests.Add(entry)
 }
 

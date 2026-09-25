@@ -16,6 +16,7 @@
 	import { cn } from '$lib/utils';
 	import ArrowRightLeftIcon from '@lucide/svelte/icons/arrow-right-left';
 	import BracesIcon from '@lucide/svelte/icons/braces';
+	import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 	import ListIcon from '@lucide/svelte/icons/list';
 	import MenuIcon from '@lucide/svelte/icons/menu';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
@@ -27,6 +28,7 @@
 	type Screen = { href: string; label: string; icon: Component; count?: number };
 
 	const screens = $derived<Screen[]>([
+		{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboardIcon },
 		{ href: '/', label: 'Endpoints', icon: ListIcon, count: app.data.mocks.length },
 		{ href: '/override', label: 'Override an endpoint', icon: SplitIcon },
 		{ href: '/payloads', label: 'Payloads', icon: BracesIcon, count: app.payloads.length },
@@ -42,6 +44,9 @@
 			: []),
 		{ href: '/settings', label: 'Settings', icon: SettingsIcon }
 	]);
+
+	// Screens with more to show side by side use more of a wide window.
+	const wide = $derived(page.url.pathname === '/dashboard');
 
 	let menuOpen = $state(false);
 
@@ -153,7 +158,10 @@
 
 	<main class="min-w-0 flex-1">
 		<div
-			class="mx-auto grid max-w-(--content-max-width) gap-(--section-gap) px-(--page-padding-x) py-(--page-padding-y)"
+			class={cn(
+				'mx-auto grid gap-(--section-gap) px-(--page-padding-x) py-(--page-padding-y)',
+				wide ? 'max-w-(--wide-content-max-width)' : 'max-w-(--content-max-width)'
+			)}
 		>
 			{#if app.error}
 				<p

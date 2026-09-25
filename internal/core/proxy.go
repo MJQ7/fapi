@@ -13,6 +13,13 @@ import (
 // they're dropped instead of being copied from one connection to the other.
 var connectionHeaders = []string{"Host", "Connection", "Content-Length", "Transfer-Encoding", "Keep-Alive"}
 
+// Accept-Encoding isn't forwarded either, so the real API's response isn't
+// compressed in a way fapi can't read (such as Brotli) and can be logged
+// (see capture.go).
+// Go asks for gzip instead and decompresses it, so the frontend gets the
+// response uncompressed.
+const acceptEncoding = "Accept-Encoding"
+
 // newUpstreamClient returns the HTTP client used to call the real API.
 func newUpstreamClient() *http.Client {
 	return &http.Client{
@@ -25,8 +32,9 @@ func newUpstreamClient() *http.Client {
 }
 
 // proxy forwards request to the real API at target and copies its response
-// back. It returns the status sent to the client.
-func (c *Core) proxy(port int, target upstream, writer http.ResponseWriter, request *http.Request, body []byte) int {
+// back. It returns the status sent to the client and, when the real API
+// couldn't be reached, why.
+func (c *Core) proxy(port int, target upstream, writer http.ResponseWriter, request *http.Request, body []byte) (int, string) {
 	address := c.upstreamURL(target)
 	url := address + request.URL.EscapedPath()
 	if request.URL.RawQuery != "" {
@@ -40,6 +48,7 @@ func (c *Core) proxy(port int, target upstream, writer http.ResponseWriter, requ
 		return c.upstreamFailed(port, address, writer, request, err)
 	}
 	upstreamRequest.Header = copyHeaders(request.Header)
+	upstreamRequest.Header.Del(acceptEncoding)
 
 	response, err := c.upstreams.Do(upstreamRequest)
 	if err != nil {
@@ -65,11 +74,11 @@ func (c *Core) proxy(port int, target upstream, writer http.ResponseWriter, requ
 	}
 
 	log.Printf("[%d] %s %s -> proxied to %s (%d)", port, request.Method, request.URL.Path, address, response.StatusCode)
-	return response.StatusCode
+	return response.StatusCode, ""
 }
 
 // upstreamFailed answers 502 Bad Gateway when the real API can't be reached.
-func (c *Core) upstreamFailed(port int, address string, writer http.ResponseWriter, request *http.Request, err error) int {
+func (c *Core) upstreamFailed(port int, address string, writer http.ResponseWriter, request *http.Request, err error) (int, string) {
 	log.Printf("[%d] %s %s -> could not reach the real API at %s: %v", port, request.Method, request.URL.Path, address, err)
 
 	origin := request.Header.Get("Origin")
@@ -78,7 +87,7 @@ func (c *Core) upstreamFailed(port int, address string, writer http.ResponseWrit
 	}
 	message := fmt.Sprintf("fapi could not reach the real API at %s: %v", address, err)
 	writeJSON(writer, http.StatusBadGateway, map[string]string{"message": message})
-	return http.StatusBadGateway
+	return http.StatusBadGateway, message
 }
 
 // copyHeaders copies headers, leaving out the connection-level ones.

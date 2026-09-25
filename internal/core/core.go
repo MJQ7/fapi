@@ -24,7 +24,8 @@ type Core struct {
 	settings  config.Config
 	dataFile  string // path of mocks.json
 	requests  *RequestLog
-	upstreams *http.Client // used to forward requests to the real API
+	traffic   trafficCounter // the dashboard's request counts
+	upstreams *http.Client   // used to forward requests to the real API
 
 	// mutex protects every field below it, since each request is handled
 	// concurrently.
