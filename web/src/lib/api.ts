@@ -239,7 +239,7 @@ export async function clearRequests(): Promise<void> {
 export type TrafficCounts = {
 	received: number; // always proxied + sent
 	proxied: number; // forwarded to the real API
-	sent: number; // answered by fapi itself: an endpoint, a 404 or a CORS preflight
+	sent: number; // answered by fapi itself: an endpoint or a CORS preflight
 };
 
 /** The periods a traffic report can cover, in minutes. */

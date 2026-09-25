@@ -35,7 +35,7 @@ export const trafficSeries: TrafficSeries[] = [
 	{
 		kind: 'sent',
 		label: 'Sent',
-		description: 'answered by fapi itself: an endpoint, a 404 or a CORS preflight',
+		description: 'answered by fapi itself: an endpoint or a CORS preflight',
 		stroke: 'stroke-chart-3',
 		fill: 'fill-chart-3',
 		swatch: 'bg-chart-3'

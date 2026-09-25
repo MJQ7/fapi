@@ -3,17 +3,18 @@
   one's port, method, path and status, and whether fapi proxied it or sent
   the response itself. It can be narrowed to proxied or sent requests and to
   one port, and opening a request shows its payload and the response it got
-  (the real API's, when proxied), each with a button to copy it. Everything
-  is shown as text (Svelte escapes {values}), never as HTML, because it came
-  from whoever sent the request or from the real API.
+  (the real API's, when proxied), with buttons to copy them (see
+  MessagePart). Everything is shown as text (Svelte escapes {values}), never
+  as HTML, because it came from whoever sent the request or from the real
+  API.
 -->
 <script lang="ts">
 	import type { LoggedRequest, Mock, Proxy } from '$lib/api';
-	import { formatBody, formatTime } from '$lib/format';
+	import { formatTime } from '$lib/format';
 	import { requestKind, trafficSeries, type TrafficKind } from '$lib/traffic';
 	import { cn } from '$lib/utils';
 	import ChoiceButtons from './ChoiceButtons.svelte';
-	import CopyButton from './CopyButton.svelte';
+	import MessagePart from './MessagePart.svelte';
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select';
 
 	type Props = {
@@ -73,6 +74,29 @@
 		}
 	}
 
+	/**
+	 * Where a proxied request's response came from: the real API's host, such
+	 * as "api.example.com", or "port 3000" when it's on this machine. If the
+	 * proxy has changed since, only the port is known.
+	 */
+	function responseSource(request: LoggedRequest): string {
+		const proxy = proxies?.find((saved) => saved.port === request.port);
+		if (!proxy || proxy.upstreamPort !== request.upstream) {
+			return `port ${request.upstream}`;
+		}
+		const url = new URL(proxy.realAPI);
+		return isThisMachine(url.hostname) ? `port ${request.upstream}` : url.host;
+	}
+
+	/** Whether a host name, as URL.hostname writes it, means this machine. */
+	function isThisMachine(hostname: string): boolean {
+		return (
+			['localhost', '[::1]', '0.0.0.0', 'host.docker.internal'].includes(hostname) ||
+			hostname.endsWith('.localhost') ||
+			hostname.startsWith('127.')
+		);
+	}
+
 	function statusClass(status: number): string {
 		if (status >= 500) {
 			return 'text-destructive';
@@ -83,30 +107,6 @@
 		return 'text-muted-foreground';
 	}
 </script>
-
-<!-- A request or response: a heading with a copy button, a line of details, then the body. -->
-{#snippet part(heading: string, copyLabel: string, details: string, text: string, truncated: boolean, empty: string)}
-	<div class="grid content-start gap-1">
-		<div class="flex min-h-6 items-center justify-between gap-2">
-			<p class="text-foreground font-medium">{heading}</p>
-			{#if text}
-				<CopyButton text={formatBody(text)} label={copyLabel} />
-			{/if}
-		</div>
-		<p class="text-muted-foreground">{details}</p>
-		{#if text}
-			<pre
-				class="bg-muted max-h-72 overflow-auto rounded-md p-2 font-mono break-all whitespace-pre-wrap">{formatBody(
-					text
-				)}</pre>
-			{#if truncated}
-				<p class="text-muted-foreground">The body was cut at fapi's size limit.</p>
-			{/if}
-		{:else}
-			<p class="text-muted-foreground">{empty}</p>
-		{/if}
-	</div>
-{/snippet}
 
 <div class="grid gap-3">
 	<div class="flex flex-wrap items-center gap-2 px-(--card-spacing)">
@@ -130,13 +130,13 @@
 							'hover:bg-muted/50 focus-visible:bg-muted/50 outline-none'
 						)}
 					>
-						<span class="flex items-baseline gap-2">
+						<span class="flex items-baseline gap-2 text-base">
 							<span class="size-2 shrink-0 self-center rounded-full {series?.swatch}" aria-hidden="true"></span>
 							<span class="font-medium">{request.method}</span>
-							<span class="min-w-0 flex-1 font-mono text-xs break-all">{request.path}{request.search}</span>
+							<span class="min-w-0 flex-1 font-mono text-sm break-all">{request.path}{request.search}</span>
 							<span class="font-medium tabular-nums {statusClass(request.status)}">{request.status}</span>
 						</span>
-						<span class="text-muted-foreground flex flex-wrap gap-x-2 pl-4 text-xs">
+						<span class="text-muted-foreground flex flex-wrap gap-x-2 pl-4 text-sm">
 							<span class="tabular-nums">{formatTime(request.time)}</span>
 							<span>· port {request.port}</span>
 							<span>· {describe(request)}</span>
@@ -144,33 +144,35 @@
 					</summary>
 
 					<!-- The request and response side by side when there's room. -->
-					<div class="@container px-(--card-spacing) pb-3 pl-[calc(var(--card-spacing)+1rem)] text-xs">
-						<div class="grid gap-3 @xl:grid-cols-2">
-							{@render part(
-								'Request',
-								'Copy the request body',
-								`${request.contentType || 'No content type'} · from port ${request.fromPort}`,
-								request.body,
-								request.bodyTruncated,
-								'No payload'
-							)}
+					<div class="@container px-(--card-spacing) pb-4 pl-[calc(var(--card-spacing)+1rem)] text-sm">
+						<div class="grid gap-4 @2xl:grid-cols-2">
+							<MessagePart
+								name="request"
+								heading="Request"
+								details="{request.contentType || 'No content type'} · from port {request.fromPort}"
+								body={request.body}
+								truncated={request.bodyTruncated}
+								empty="No payload"
+							/>
 
 							{#if request.response?.error}
 								<div class="grid content-start gap-1">
-									<p class="text-foreground flex min-h-6 items-center font-medium">
-										No response from the real API
+									<p class="text-foreground flex min-h-7 items-center font-medium">
+										No response from {responseSource(request)}
 									</p>
 									<p class="text-destructive">{request.response.error}</p>
 								</div>
 							{:else if request.response}
-								{@render part(
-									request.outcome === 'proxied' ? 'Response from the real API' : 'Response from fapi',
-									'Copy the response body',
-									`${request.response.contentType || 'No content type'} · status ${request.status}`,
-									request.response.body,
-									request.response.bodyTruncated,
-									'No body'
-								)}
+								<MessagePart
+									name="response"
+									heading={request.outcome === 'proxied'
+										? `Response from ${responseSource(request)}`
+										: 'Response from fapi'}
+									details="{request.response.contentType || 'No content type'} · status {request.status}"
+									body={request.response.body}
+									truncated={request.response.bodyTruncated}
+									empty="No body"
+								/>
 							{/if}
 						</div>
 					</div>

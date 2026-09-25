@@ -1,9 +1,17 @@
-# Publishes a release when a version tag such as v1.2.3 is pushed, using the
-# same GoReleaser configuration as a local build (.goreleaser.yaml).
+# Publishes a release for a version tag such as v1.2.3, using the same
+# GoReleaser configuration as a local build (.goreleaser.yaml), but only
+# once the tagged commit is on master:
+#
+# - A tag pushed on a commit already on master is released straight away.
+# - A tag pushed on a branch waits, and is released when the branch is merged
+#   into master. The merge must keep the tagged commit: a merge commit or a
+#   fast-forward does, but a squash or rebase merge makes new commits, so
+#   with those, tag master after merging instead.
 name: Release
 
 on:
   push:
+    branches: [master]
     tags: ['v*']
 
 permissions:
@@ -11,11 +19,46 @@ permissions:
   packages: write # to push the Docker image to ghcr.io
 
 jobs:
+  # Finds the tag to release, if any: the pushed tag, or after a push to
+  # master, the newest tag on master. Either is skipped if it isn't on master
+  # yet or already has a release.
+  find:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.find.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # every branch and tag, to see what's on master
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag=$(git tag --merged origin/master --list 'v*' --sort=-version:refname | head -n 1)
+          fi
+
+          if [ -z "$tag" ]; then
+            echo "There are no version tags on master."
+          elif ! git merge-base --is-ancestor "$tag" origin/master; then
+            echo "$tag isn't on master yet. It will be released when it's merged."
+          elif gh release view "$tag" > /dev/null 2>&1; then
+            echo "$tag has already been released."
+          else
+            echo "Releasing $tag."
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: find
+    if: needs.find.outputs.tag != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: ${{ needs.find.outputs.tag }} # GoReleaser builds the tagged commit
           fetch-depth: 0 # GoReleaser reads earlier tags for the changelog
       - uses: actions/setup-go@v6
         with:

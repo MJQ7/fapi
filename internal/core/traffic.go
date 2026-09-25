@@ -19,7 +19,7 @@ const (
 type TrafficCounts struct {
 	Received int `json:"received"`
 	Proxied  int `json:"proxied"` // forwarded to the real API
-	Sent     int `json:"sent"`    // answered by fapi itself: an endpoint, a 404 or a CORS preflight
+	Sent     int `json:"sent"`    // answered by fapi itself: an endpoint or a CORS preflight
 }
 
 // TrafficReport is the traffic on each port over a period, in equal steps,
