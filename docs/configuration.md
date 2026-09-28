@@ -69,6 +69,7 @@ Every optional feature can be turned off under `features`. Endpoints themselves 
 | `requestLog` | on | Recording requests, the web UI's **Requests** column and the request log's API routes. |
 | `requestLogPersistence` | off | Saving the request log to `requests.json` in the data folder, so it survives restarts. |
 | `liveUpdates` | on | Streaming new requests to the web UI as they arrive. When off, the web UI checks every 2 seconds instead. |
+| `installUpdates` | on | Downloading and installing a newer release from the **Settings** screen. When off, the screen still says when there's one. fapi has no login, so turn this off if others can reach its admin port (`listenAddress` isn't `127.0.0.1`). |
 
 When a feature is off, its admin API routes answer 404 with `{"message": "<flag> is turned off in the fapi config"}`, and the web UI hides it.
 
@@ -87,7 +88,8 @@ Turning a feature off doesn't delete its saved data. For example, pass-throughs 
     "cors": true,
     "requestLog": true,
     "requestLogPersistence": false,
-    "liveUpdates": true
+    "liveUpdates": true,
+    "installUpdates": true
   },
   "requestLog": { "maxEntries": 200, "maxBodyBytes": 4096 },
   "passThrough": { "host": "localhost" }

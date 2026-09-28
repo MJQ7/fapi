@@ -18,6 +18,9 @@ COPY packaging/docker-config.json /etc/fapi/config.json
 # Use your own settings file by mounting it and changing FAPI_CONFIG.
 ENV FAPI_DATA_DIR=/data
 ENV FAPI_CONFIG=/etc/fapi/config.json
+# Tells fapi it's in a container, which is updated by updating the container
+# rather than from the web UI (see internal/updates/install.go).
+ENV FAPI_INSTALL=docker
 VOLUME /data
 
 # The admin port. Mock ports are published with `docker run -p` as needed.

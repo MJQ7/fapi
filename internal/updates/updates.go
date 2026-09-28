@@ -1,7 +1,12 @@
-// Package updates checks GitHub for a newer release of fapi. It only asks
-// GitHub when a UI asks for the check (the web UI's Settings screen), never
-// in the background, and remembers the answer for an hour so opening the
-// screen again doesn't ask again.
+// Package updates checks GitHub for a newer release of fapi, and installs
+// it. It only asks GitHub when a UI asks for the check (the web UI's Settings
+// screen), never in the background, and remembers the answer for an hour so
+// opening the screen again doesn't ask again.
+//
+// How an update is installed depends on how fapi was (install.go): the
+// Installer (installer.go) downloads it on the machine fapi runs on, checks
+// it, then replaces fapi.exe on Windows, or asks the .deb or .rpm's root
+// helper to install the package (apply.go).
 package updates
 
 import (
@@ -45,12 +50,19 @@ type Result struct {
 
 	CheckedAt time.Time `json:"checkedAt"`
 	Error     string    `json:"error,omitempty"` // why the check failed, worded for the user
+
+	// How the running fapi was installed, and whether it can update itself.
+	Install Installation `json:"install"`
+	// The release file an update would download, such as
+	// "fapi_1.2.0_linux_amd64.deb", or "" when there's none.
+	Asset string `json:"asset"`
 }
 
 // Checker checks for updates, remembering the last answer.
 type Checker struct {
 	url     string
 	current string
+	detect  func() Installation // describes the running fapi (see Detect)
 	client  *http.Client
 
 	mutex sync.Mutex
@@ -58,11 +70,14 @@ type Checker struct {
 }
 
 // NewChecker returns a checker for the releases listed at url (normally
-// ReleasesURL), comparing them with the running version current.
-func NewChecker(url string, current string) *Checker {
+// ReleasesURL), comparing them with the running version current. detect
+// describes the running fapi; it's called at every check, since whether it
+// can install updates may change while it runs.
+func NewChecker(url string, current string, detect func() Installation) *Checker {
 	return &Checker{
 		url:     url,
 		current: current,
+		detect:  detect,
 		client:  &http.Client{Timeout: 10 * time.Second},
 	}
 }
@@ -73,16 +88,23 @@ func (c *Checker) Check(ctx context.Context, force bool) Result {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if c.last != nil && !force {
-		age := time.Since(c.last.CheckedAt)
-		if age < cacheFor && (c.last.Error == "" || age < cacheFailures) {
-			return *c.last
-		}
+	if c.last == nil || force || c.expired() {
+		result := c.ask(ctx)
+		c.last = &result
 	}
 
-	result := c.ask(ctx)
-	c.last = &result
+	result := *c.last
+	result.Install = c.detect()
+	if result.Latest != "" {
+		result.Asset = AssetName(result.Install.Package, result.Latest, result.Install.Type)
+	}
 	return result
+}
+
+// expired reports whether the last answer is too old to reuse.
+func (c *Checker) expired() bool {
+	age := time.Since(c.last.CheckedAt)
+	return age >= cacheFor || (c.last.Error != "" && age >= cacheFailures)
 }
 
 // release is the part of GitHub's release JSON fapi reads.

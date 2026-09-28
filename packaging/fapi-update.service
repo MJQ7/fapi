@@ -1,0 +1,11 @@
+# Installs an update fapi downloaded, as root, then the package's own
+# scripts restart the fapi service. Started by fapi-update.path; see
+# internal/updates/apply.go for the checks it makes before installing.
+# Its log: journalctl -u fapi-update
+[Unit]
+Description=Install a fapi update downloaded from its web UI
+
+[Service]
+Type=oneshot
+ExecStart=/opt/fapi/fapi apply-update --data-dir /var/lib/fapi
+TimeoutStartSec=10min
