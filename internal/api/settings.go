@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"log"
 	"net/http"
@@ -63,14 +62,4 @@ func (a *API) portSettings(saved config.Ports) portSettingsResponse {
 		Saved:         saved,
 		RestartNeeded: saved != active,
 	}
-}
-
-// getUpdates answers GET /api/updates: whether GitHub has a newer release.
-// The answer is remembered for an hour; ?force=true asks GitHub again.
-func (a *API) getUpdates(writer http.ResponseWriter, request *http.Request) {
-	force := request.URL.Query().Get("force") == "true"
-	// WithoutCancel: finish the check even if the browser leaves the page,
-	// so the answer is remembered rather than a "cancelled" error.
-	result := a.updates.Check(context.WithoutCancel(request.Context()), force)
-	writeJSON(writer, http.StatusOK, result)
 }

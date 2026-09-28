@@ -1,4 +1,4 @@
-# Checks what's merged into master: Go formatting, vet and staticcheck on
+# Checks what's merged into master: Go formatting, vet, staticcheck and tests on
 # Linux and Windows (the systems fapi is released for), and the web UI's type
 # check and build. It runs on every push to master, including merges, but not
 # on other branches. Releases are published by the Release workflow.
@@ -53,6 +53,9 @@ jobs:
           go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
           go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 -tags notui ./...
           go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 -tags nowebui ./...
+
+      - name: go test
+        run: go test ./...
 
       # Also proves fapi builds before the web UI is built.
       - name: go build

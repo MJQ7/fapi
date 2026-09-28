@@ -17,11 +17,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"fapi/internal/updates"
 	"fapi/web"
 )
 
@@ -75,7 +78,22 @@ func run(arguments []string) int {
 	command := arguments[0]
 	switch command {
 	case "serve":
-		err := serve(arguments[1:])
+		executable := currentExecutable()
+		err := serve(arguments[1:], executable)
+		if errors.Is(err, errRestart) {
+			// Installed an update (Windows): start the new executable the
+			// same way this one was started.
+			err = updates.Relaunch(executable, arguments)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "fapi: %v\n", err)
+			return 1
+		}
+		return 0
+	case "apply-update":
+		// Not in the usage: only the .deb and .rpm's fapi-update service
+		// runs it, as root (see update.go).
+		err := applyUpdate(arguments[1:])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "fapi: %v\n", err)
 			return 1
@@ -113,6 +131,36 @@ func edition() string {
 		return "no UI"
 	}
 	return strings.Join(parts, " and ")
+}
+
+// packageName is the name this edition is released under (see
+// .goreleaser.yaml), or "" for a build with neither UI, which isn't released.
+func packageName() string {
+	switch {
+	case web.Included && tuiIncluded:
+		return "fapi"
+	case web.Included:
+		return "fapi-web"
+	case tuiIncluded:
+		return "fapi-cli"
+	default:
+		return ""
+	}
+}
+
+// currentExecutable returns the path of the running executable, with links
+// followed (/usr/bin/fapi is a link to /opt/fapi/fapi), or "" if it can't be
+// found.
+func currentExecutable() string {
+	executable, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	resolved, err := filepath.EvalSymlinks(executable)
+	if err != nil {
+		return executable
+	}
+	return resolved
 }
 
 // isTerminal reports whether fapi is talking to a person in a terminal,

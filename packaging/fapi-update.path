@@ -1,0 +1,17 @@
+# Starts fapi-update.service when fapi asks for an update to be installed,
+# by writing updates/request.json in its data folder. fapi runs as an
+# unprivileged user and can't install packages; the helper runs as root.
+#
+# With DynamicUser (see fapi.service), the data folder is really
+# /var/lib/private/fapi, and /var/lib/fapi is a link to it. Both are
+# watched, since systemd watches the path as written.
+[Unit]
+Description=Watch for fapi update requests
+
+[Path]
+PathExists=/var/lib/private/fapi/updates/request.json
+PathExists=/var/lib/fapi/updates/request.json
+Unit=fapi-update.service
+
+[Install]
+WantedBy=multi-user.target

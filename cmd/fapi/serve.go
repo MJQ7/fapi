@@ -13,18 +13,29 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"fapi/internal/api"
 	"fapi/internal/config"
 	"fapi/internal/core"
+	"fapi/internal/updates"
 	"fapi/web"
 )
 
+// errRestart is returned by serve when it stopped to restart as a newly
+// installed version.
+var errRestart = errors.New("restart requested")
+
+// restartWaitTimeout is how long a restarted fapi waits for the admin port.
+const restartWaitTimeout = 15 * time.Second
+
 // serve runs fapi in the foreground until it's stopped with Ctrl+C, a stop
-// signal (as systemd and Docker send), or POST /api/shutdown.
-func serve(arguments []string) error {
+// signal (as systemd and Docker send), or POST /api/shutdown. executable is
+// the running executable's path. It returns errRestart when an installed
+// update needs fapi to restart; run then starts the new executable.
+func serve(arguments []string, executable string) error {
 	flags := flag.NewFlagSet("serve", flag.ContinueOnError)
 	configFlag := flags.String("config", "", "settings file overriding the built-in defaults")
 	dataDirFlag := flags.String("data-dir", "", "folder where endpoints and logs are saved")
@@ -56,6 +67,7 @@ func serve(arguments []string) error {
 		return err
 	}
 	log.Printf("fapi %s (%s), data folder %s", version, edition(), dataDir)
+	updates.CleanUp(executable)
 
 	// An edition built without the web UI reports it as off, so clients
 	// (GET /api/config) hide it, whatever the settings say.
@@ -71,7 +83,7 @@ func serve(arguments []string) error {
 	// Claim the admin port before anything else, so a second copy of fapi
 	// stops here instead of fighting over the mock ports.
 	adminAddress := net.JoinHostPort(settings.ListenAddress, strconv.Itoa(settings.AdminPort))
-	listener, err := net.Listen("tcp4", adminAddress)
+	listener, err := listenAdmin(adminAddress)
 	if err != nil {
 		return fmt.Errorf("could not use the admin port %d (is fapi already running?): %w", settings.AdminPort, err)
 	}
@@ -84,8 +96,39 @@ func serve(arguments []string) error {
 	stopped, stopFapi := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopFapi()
 
-	handler := api.New(fapi, version, stopFapi, config.SettingsFile(source, dataDir))
-	return runAdminServer(stopped, listener, handler, settings)
+	// An installed update restarts fapi by stopping it, and saying so here.
+	var restartRequested atomic.Bool
+	restart := func() {
+		restartRequested.Store(true)
+		stopFapi()
+	}
+	detect := func() updates.Installation {
+		return updates.Detect(packageName(), executable, settings.Features.InstallUpdates)
+	}
+	checker := updates.NewChecker(updates.ReleasesURL, version, detect)
+	installer := updates.NewInstaller(checker, dataDir, restart)
+
+	handler := api.New(fapi, version, stopFapi, config.SettingsFile(source, dataDir), checker, installer)
+	err = runAdminServer(stopped, listener, handler, settings)
+	if err == nil && restartRequested.Load() {
+		log.Printf("Restarting as the new version")
+		return errRestart
+	}
+	return err
+}
+
+// listenAdmin claims the admin port. Straight after an update, the old fapi
+// may still be letting go of it (FAPI_RESTARTED is set; see
+// updates.Relaunch), so then it keeps trying for a while.
+func listenAdmin(address string) (net.Listener, error) {
+	deadline := time.Now().Add(restartWaitTimeout)
+	for {
+		listener, err := net.Listen("tcp4", address)
+		if err == nil || os.Getenv("FAPI_RESTARTED") == "" || time.Now().After(deadline) {
+			return listener, err
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
 }
 
 // runAdminServer serves the admin API and web UI until stopped is done.

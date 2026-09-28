@@ -49,6 +49,7 @@ type Features struct {
 	RequestLog            bool `json:"requestLog"`
 	RequestLogPersistence bool `json:"requestLogPersistence"`
 	LiveUpdates           bool `json:"liveUpdates"`
+	InstallUpdates        bool `json:"installUpdates"`
 }
 
 // RequestLogSettings limits how much the request log keeps.

@@ -29,17 +29,20 @@ type API struct {
 	shutdown     func() // stops fapi gracefully; called by POST /api/shutdown
 	settingsFile string // where the Settings screen saves ports (see config.SettingsFile)
 	updates      *updates.Checker
+	installer    *updates.Installer
 }
 
 // New returns the handler for the admin port: the API routes, and the web UI
-// for every other path. settingsFile is the file port settings are saved to.
-func New(fapi *core.Core, version string, shutdown func(), settingsFile string) http.Handler {
+// for every other path. settingsFile is the file port settings are saved to;
+// checker and installer check for and install updates.
+func New(fapi *core.Core, version string, shutdown func(), settingsFile string, checker *updates.Checker, installer *updates.Installer) http.Handler {
 	a := &API{
 		core:         fapi,
 		version:      version,
 		shutdown:     shutdown,
 		settingsFile: settingsFile,
-		updates:      updates.NewChecker(updates.ReleasesURL, version),
+		updates:      checker,
+		installer:    installer,
 	}
 	features := fapi.Settings().Features
 
@@ -51,6 +54,8 @@ func New(fapi *core.Core, version string, shutdown func(), settingsFile string) 
 	mux.HandleFunc("GET /api/settings/ports", a.getPortSettings)
 	mux.HandleFunc("PUT /api/settings/ports", a.putPortSettings)
 	mux.HandleFunc("GET /api/updates", a.getUpdates)
+	mux.HandleFunc("GET /api/updates/install", a.getUpdateInstall)
+	mux.HandleFunc("POST /api/updates/install", a.postUpdateInstall)
 
 	mux.HandleFunc("GET /api/mocks", a.getMocks)
 	mux.HandleFunc("POST /api/mocks", a.postMock)

@@ -79,7 +79,21 @@ journalctl -u fapi
 sudo apt remove fapi
 ```
 
-Uninstalling keeps your endpoints in `/var/lib/fapi`. To upgrade, install a newer package the same way.
+Uninstalling keeps your endpoints in `/var/lib/fapi`.
+
+## Updates
+
+The web UI's **Settings** screen says when there's a newer release, and shows how fapi was installed. Where it can, **Download and install** updates fapi in place:
+
+| Installed from | What happens |
+|---|---|
+| `.deb`, `.rpm` | fapi downloads the package into `/var/lib/fapi/updates` and checks it against the release's checksums. The `fapi-update` helper, which the package installs, then installs it as root and restarts the service. Its log: `journalctl -u fapi-update`. |
+| Windows `.zip` | fapi downloads the zip, replaces `fapi.exe` and starts again with the same options. If it was running in a console window, the window closes and fapi carries on in the background. |
+| Docker | Update the container to the new image. |
+
+The download happens on the machine fapi runs on, not in your browser, so a fapi in WSL is updated in WSL. When fapi can't install the update itself (a package fapi isn't running as the service, say, or a `fapi.exe` in a folder it can't change), **Download** saves it and shows the command that installs it. Anything else, such as a build from source, is updated the way you installed it. To install a package by hand instead, use `sudo apt install` or `sudo dnf install` as above; the service restarts by itself.
+
+Installing updates can be turned off with the `installUpdates` setting (see [docs/configuration.md](docs/configuration.md#feature-flags)).
 
 ## Docker
 

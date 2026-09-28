@@ -79,6 +79,7 @@ export type Settings = {
 		requestLog: boolean;
 		requestLogPersistence: boolean;
 		liveUpdates: boolean;
+		installUpdates: boolean;
 	};
 	requestLog: { maxEntries: number; maxBodyBytes: number };
 	passThrough: { host: string };
@@ -112,6 +113,44 @@ export type UpdateCheck = {
 	developmentBuild: boolean;
 	checkedAt: string;
 	error?: string; // why the check failed
+	install: Installation;
+	/** The file an update would download, such as "fapi_1.2.0_linux_amd64.deb", or ''. */
+	asset: string;
+};
+
+/** How the running fapi was installed, and whether it can update itself. */
+export type Installation = {
+	type: 'deb' | 'rpm' | 'windows' | 'docker' | 'manual';
+	package: string; // the edition: fapi, fapi-web or fapi-cli
+	os: string; // as Go names it, such as "linux" or "windows"
+	arch: string; // such as "amd64"
+	wsl: boolean; // Linux in Windows Subsystem for Linux
+	/** fapi can download, install and restart by itself. */
+	canInstall: boolean;
+	/** fapi can at least download an update, for you to install. */
+	canDownload: boolean;
+	reason?: string; // why it can't install updates itself
+};
+
+/** An update being downloaded or installed, or how the last one went. */
+export type UpdateJob = {
+	state: 'idle' | 'downloading' | 'installing' | 'restarting' | 'downloaded' | 'failed';
+	version?: string;
+	downloaded: number; // bytes so far
+	total: number; // bytes in all, or 0 when unknown
+	file?: string; // where it was downloaded, on the machine fapi runs on
+	command?: string; // installs the downloaded file, when fapi can't
+	error?: string;
+	/** How the last install went, when none is running. */
+	last?: { version: string; ok: boolean; error?: string; time: string };
+};
+
+/** The running fapi, from GET /api/status. */
+export type Status = {
+	pid: number;
+	version: string;
+	adminPort: number;
+	mockPorts: number[];
 };
 
 /** An error from the admin API, with its message worded for the user. */
@@ -136,6 +175,23 @@ export function savePortSettings(ports: Ports): Promise<PortSettings> {
  */
 export function checkForUpdates(force = false): Promise<UpdateCheck> {
 	return send<UpdateCheck>('GET', force ? '/api/updates?force=true' : '/api/updates');
+}
+
+/**
+ * Downloads version (the newest release) on the machine fapi runs on and,
+ * where it can, installs it and restarts fapi. It returns straight away;
+ * getUpdateJob follows the progress.
+ */
+export function installUpdate(version: string): Promise<UpdateJob> {
+	return send<UpdateJob>('POST', '/api/updates/install', { version });
+}
+
+export function getUpdateJob(): Promise<UpdateJob> {
+	return send<UpdateJob>('GET', '/api/updates/install');
+}
+
+export function getStatus(): Promise<Status> {
+	return send<Status>('GET', '/api/status');
 }
 
 export function getMocks(): Promise<MocksData> {
