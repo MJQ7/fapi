@@ -1,8 +1,8 @@
 <!--
-  The Proxies screen: which real API port each fapi port forwards to.
+  The Proxies screen: which real API port each fapi port forwards to. A port
+  can have several proxies, but only one is on at a time.
 -->
 <script lang="ts">
-	import * as api from '$lib/api';
 	import { app } from '$lib/app-state.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import ProxiesTable from '$lib/components/ProxiesTable.svelte';
@@ -13,10 +13,6 @@
 
 	function added() {
 		app.showErrors(app.loadMocks());
-	}
-
-	function remove(port: number) {
-		app.showErrors(api.setUpstream(port, null).then(app.loadMocks));
 	}
 </script>
 
@@ -29,7 +25,10 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>Add a proxy</Card.Title>
-			<Card.Description>Adding a fapi port that already has a proxy replaces it.</Card.Description>
+			<Card.Description>
+				A fapi port can have several proxies, but only one is on at a time. A new proxy is turned
+				on, and any other on its port off.
+			</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			<ProxyForm
@@ -43,12 +42,13 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>Saved proxies</Card.Title>
+			<Card.Description>Turning a proxy on turns off the others on its port.</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			<ProxiesTable
 				proxies={app.proxies ?? []}
-				onSetEnabled={app.setUpstreamEnabled}
-				onDelete={remove}
+				onSetEnabled={app.setProxyEnabled}
+				onDelete={app.deleteProxy}
 			/>
 		</Card.Content>
 	</Card.Root>

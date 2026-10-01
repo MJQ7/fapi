@@ -11,12 +11,15 @@ import (
 
 // mocksResponse is the body of GET /api/mocks.
 type mocksResponse struct {
-	Enabled   bool        `json:"enabled"`
-	Mocks     []core.Mock `json:"mocks"`
-	Upstreams map[int]int `json:"upstreams"`
+	Enabled bool         `json:"enabled"`
+	Mocks   []core.Mock  `json:"mocks"`
+	Proxies []core.Proxy `json:"proxies"` // in the order added
 
-	// The real API host of the proxies that don't use passThrough.host, and
-	// the ports whose proxy is turned off.
+	// The proxies the older way, one per port, for clients written before a
+	// port could have several (such as the terminal UI): each port's real
+	// API port, the real API host of those not using passThrough.host, and
+	// the ports whose proxy is off. See core.ProxiesByPort.
+	Upstreams         map[int]int    `json:"upstreams"`
 	UpstreamHosts     map[int]string `json:"upstreamHosts"`
 	DisabledUpstreams map[int]bool   `json:"disabledUpstreams"`
 }
@@ -27,18 +30,16 @@ func (a *API) getMocks(writer http.ResponseWriter, request *http.Request) {
 
 	// Saved pass-throughs are kept but unused while the feature is off, so
 	// they aren't shown.
-	upstreams := data.Upstreams
-	upstreamHosts := data.UpstreamHosts
-	disabledUpstreams := data.DisabledUpstreams
+	proxies := data.Proxies
 	if !a.core.Settings().Features.PassThrough {
-		upstreams = map[int]int{}
-		upstreamHosts = map[int]string{}
-		disabledUpstreams = map[int]bool{}
+		proxies = []core.Proxy{}
 	}
+	upstreams, upstreamHosts, disabledUpstreams := core.ProxiesByPort(proxies)
 
 	writeJSON(writer, http.StatusOK, mocksResponse{
 		Enabled:           data.Enabled,
 		Mocks:             data.Mocks,
+		Proxies:           proxies,
 		Upstreams:         upstreams,
 		UpstreamHosts:     upstreamHosts,
 		DisabledUpstreams: disabledUpstreams,
@@ -159,8 +160,8 @@ func (a *API) putMockEnabled(writer http.ResponseWriter, request *http.Request) 
 	writer.WriteHeader(http.StatusNoContent)
 }
 
-// putUpstreamEnabled answers PUT /api/upstreams/{port}/enabled: turn one
-// proxy on or off.
+// putUpstreamEnabled answers PUT /api/upstreams/{port}/enabled: turn a
+// port's proxy on or off, the older way (see core.SetUpstreamEnabled).
 func (a *API) putUpstreamEnabled(writer http.ResponseWriter, request *http.Request) {
 	fapiPort, err := strconv.Atoi(request.PathValue("port"))
 	if err != nil {
@@ -185,7 +186,8 @@ func (a *API) putUpstreamEnabled(writer http.ResponseWriter, request *http.Reque
 	writer.WriteHeader(http.StatusNoContent)
 }
 
-// putUpstream answers PUT /api/upstreams/{port}: set or remove a pass-through.
+// putUpstream answers PUT /api/upstreams/{port}: add or remove a port's
+// proxy, the older way (see core.SetUpstream). The web UI uses /api/proxies.
 func (a *API) putUpstream(writer http.ResponseWriter, request *http.Request) {
 	fapiPort, err := strconv.Atoi(request.PathValue("port"))
 	if err != nil {

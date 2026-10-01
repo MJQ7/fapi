@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 
 	"fapi/internal/files"
 )
@@ -30,6 +31,23 @@ type Mock struct {
 	Disabled bool `json:"disabled,omitempty"`
 }
 
+// Proxy forwards the requests to a fapi port that no endpoint answers to
+// the real API. A port can have several proxies, but only one of them is on
+// at a time (see proxies.go).
+type Proxy struct {
+	ID           string `json:"id"`
+	Port         int    `json:"port"`         // the fapi port
+	UpstreamPort int    `json:"upstreamPort"` // the real API port
+
+	// Host is the real API host, starting with https:// if it uses HTTPS,
+	// or "" for passThrough.host in fapi's settings.
+	Host string `json:"host,omitempty"`
+
+	// Disabled proxies are kept but don't forward anything. Like Mock's,
+	// it's "disabled" so a missing value means on.
+	Disabled bool `json:"disabled,omitempty"`
+}
+
 // Data is the user's data, saved in mocks.json.
 type Data struct {
 	// When Enabled is false, endpoints are ignored and every request goes to
@@ -38,20 +56,18 @@ type Data struct {
 
 	Mocks []Mock `json:"mocks"`
 
-	// Upstreams maps a fapi port to the real API port its unmatched requests
-	// are forwarded to. JSON object keys are always strings, so the file
-	// holds {"3001": 3000}; encoding/json converts the keys to and from int.
-	Upstreams map[int]int `json:"upstreams"`
+	// Proxies are in the order they were added.
+	Proxies []Proxy `json:"proxies"`
 
-	// UpstreamHosts holds the real API host of the fapi ports whose real API
-	// isn't on passThrough.host, such as {"3001": "https://api.example.com"}.
-	// It's kept apart from Upstreams so mocks.json files and API clients
-	// that only know about ports keep working.
-	UpstreamHosts map[int]string `json:"upstreamHosts,omitempty"`
-
-	// DisabledUpstreams lists the fapi ports whose proxy is kept but turned
-	// off: their unmatched requests get a 404 instead of being forwarded.
-	DisabledUpstreams map[int]bool `json:"disabledUpstreams,omitempty"`
+	// The way fapi saved proxies before a port could have more than one:
+	// Upstreams maps a fapi port to its real API port ({"3001": 3000}),
+	// UpstreamHosts holds the real API hosts that aren't passThrough.host,
+	// and DisabledUpstreams the ports whose proxy is off. A file without
+	// "proxies" is read from these. They're still written, with each port's
+	// shown proxy (see portProxy), so an older fapi can read the file.
+	Upstreams         map[int]int    `json:"upstreams"`
+	UpstreamHosts     map[int]string `json:"upstreamHosts,omitempty"`
+	DisabledUpstreams map[int]bool   `json:"disabledUpstreams,omitempty"`
 
 	// Payloads are saved responses that UIs offer when adding an endpoint,
 	// so the same JSON doesn't have to be typed each time.
@@ -61,16 +77,14 @@ type Data struct {
 // loadData reads mocks.json. A missing file means no endpoints yet.
 func loadData(path string) (Data, error) {
 	data := Data{
-		Enabled:           true,
-		Mocks:             []Mock{},
-		Upstreams:         map[int]int{},
-		UpstreamHosts:     map[int]string{},
-		DisabledUpstreams: map[int]bool{},
-		Payloads:          []Payload{},
+		Enabled:  true,
+		Mocks:    []Mock{},
+		Payloads: []Payload{},
 	}
 
 	contents, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
+		data.Proxies = []Proxy{}
 		return data, nil
 	}
 	if err != nil {
@@ -88,15 +102,11 @@ func loadData(path string) (Data, error) {
 	if data.Mocks == nil {
 		data.Mocks = []Mock{}
 	}
-	if data.Upstreams == nil {
-		data.Upstreams = map[int]int{}
+	if data.Proxies == nil {
+		// No "proxies": a file from an older fapi.
+		data.Proxies = proxiesFromPorts(data.Upstreams, data.UpstreamHosts, data.DisabledUpstreams)
 	}
-	if data.UpstreamHosts == nil {
-		data.UpstreamHosts = map[int]string{}
-	}
-	if data.DisabledUpstreams == nil {
-		data.DisabledUpstreams = map[int]bool{}
-	}
+	data.Upstreams, data.UpstreamHosts, data.DisabledUpstreams = nil, nil, nil
 	if data.Payloads == nil {
 		data.Payloads = []Payload{}
 	}
@@ -111,11 +121,49 @@ func loadData(path string) (Data, error) {
 
 // saveData writes mocks.json, indented so it's readable.
 func saveData(path string, data Data) error {
+	data.Upstreams, data.UpstreamHosts, data.DisabledUpstreams = ProxiesByPort(data.Proxies)
 	contents, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return err
 	}
 	return files.WriteAtomic(path, contents)
+}
+
+// proxiesFromPorts converts proxies saved the old way, one per port, to
+// Proxies, in port order.
+func proxiesFromPorts(upstreams map[int]int, hosts map[int]string, disabled map[int]bool) []Proxy {
+	proxies := []Proxy{}
+	for port, upstreamPort := range upstreams {
+		proxies = append(proxies, Proxy{
+			ID:           newID(),
+			Port:         port,
+			UpstreamPort: upstreamPort,
+			Host:         hosts[port],
+			Disabled:     disabled[port],
+		})
+	}
+	slices.SortFunc(proxies, func(a, b Proxy) int { return a.Port - b.Port })
+	return proxies
+}
+
+// ProxiesByPort converts proxies to the old way of saving them, which the
+// admin API also still sends: for each port, the proxy that's on, or else
+// the last one added (see portProxy).
+func ProxiesByPort(proxies []Proxy) (map[int]int, map[int]string, map[int]bool) {
+	upstreams := map[int]int{}
+	hosts := map[int]string{}
+	disabled := map[int]bool{}
+	for _, port := range proxyPorts(proxies) {
+		proxy := proxies[portProxy(proxies, port)]
+		upstreams[port] = proxy.UpstreamPort
+		if proxy.Host != "" {
+			hosts[port] = proxy.Host
+		}
+		if proxy.Disabled {
+			disabled[port] = true
+		}
+	}
+	return upstreams, hosts, disabled
 }
 
 // normalizeBody removes the spaces and line breaks from a JSON body, so it's

@@ -19,10 +19,15 @@ func (c *Core) route(port int, method string, path string) (*Mock, upstream) {
 		}
 	}
 
-	if !c.settings.Features.PassThrough || c.data.DisabledUpstreams[port] {
+	if !c.settings.Features.PassThrough {
 		return nil, upstream{}
 	}
-	return nil, upstream{port: c.data.Upstreams[port], host: c.data.UpstreamHosts[port]}
+	index := activeProxy(c.data.Proxies, port)
+	if index < 0 {
+		return nil, upstream{}
+	}
+	proxy := c.data.Proxies[index]
+	return nil, upstream{port: proxy.UpstreamPort, host: proxy.Host, proxyID: proxy.ID}
 }
 
 // pathMatches reports whether a request path matches an endpoint's path.

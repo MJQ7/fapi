@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"sort"
 	"sync"
 
@@ -105,24 +106,12 @@ func (c *Core) Snapshot() Data {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	snapshot := Data{
-		Enabled:           c.data.Enabled,
-		Mocks:             append([]Mock{}, c.data.Mocks...),
-		Upstreams:         map[int]int{},
-		UpstreamHosts:     map[int]string{},
-		DisabledUpstreams: map[int]bool{},
-		Payloads:          append([]Payload{}, c.data.Payloads...),
+	return Data{
+		Enabled:  c.data.Enabled,
+		Mocks:    append([]Mock{}, c.data.Mocks...),
+		Proxies:  append([]Proxy{}, c.data.Proxies...),
+		Payloads: append([]Payload{}, c.data.Payloads...),
 	}
-	for port, upstreamPort := range c.data.Upstreams {
-		snapshot.Upstreams[port] = upstreamPort
-	}
-	for port, host := range c.data.UpstreamHosts {
-		snapshot.UpstreamHosts[port] = host
-	}
-	for port, disabled := range c.data.DisabledUpstreams {
-		snapshot.DisabledUpstreams[port] = disabled
-	}
-	return snapshot
 }
 
 // ListeningPorts returns the ports mock servers are listening on, in order.
@@ -146,9 +135,7 @@ func (c *Core) usedPorts() []int {
 		ports = append(ports, mock.Port)
 	}
 	if c.settings.Features.PassThrough {
-		for port := range c.data.Upstreams {
-			ports = append(ports, port)
-		}
+		ports = append(ports, proxyPorts(c.data.Proxies)...)
 	}
 	return uniqueSorted(ports)
 }
@@ -161,8 +148,7 @@ func (c *Core) portInUse(port int) bool {
 			return true
 		}
 	}
-	_, hasUpstream := c.data.Upstreams[port]
-	return c.settings.Features.PassThrough && hasUpstream
+	return c.settings.Features.PassThrough && slices.Contains(proxyPorts(c.data.Proxies), port)
 }
 
 // save writes the data to mocks.json. The caller must hold the mutex.

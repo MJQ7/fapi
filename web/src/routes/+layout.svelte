@@ -38,7 +38,7 @@
 						href: '/proxies',
 						label: 'Proxies',
 						icon: ArrowRightLeftIcon,
-						count: Object.keys(app.data.upstreams).length
+						count: app.data.proxies.length
 					}
 				]
 			: []),

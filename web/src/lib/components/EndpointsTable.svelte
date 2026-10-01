@@ -8,6 +8,7 @@
 -->
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
+	import * as api from '$lib/api';
 	import type { LoggedRequest, Mock, Proxy } from '$lib/api';
 	import { countRequests } from '$lib/format';
 	import RequestList from './RequestList.svelte';
@@ -36,7 +37,7 @@
 		if (proxies === null) {
 			return '';
 		}
-		const proxy = proxies.find((saved) => saved.port === port);
+		const proxy = api.portProxy(proxies, port);
 		if (!proxy) {
 			return `No proxy found for port ${port}.`;
 		}

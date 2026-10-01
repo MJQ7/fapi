@@ -60,6 +60,7 @@ func (c *Core) handleMockRequest(port int, writer http.ResponseWriter, request *
 	if target.port != 0 {
 		status, failure := c.proxy(port, target, writer, request, body)
 		entry.Upstream = target.port
+		entry.ProxyID = target.proxyID
 		logged := response.logged()
 		if failure != "" {
 			// Log why, rather than the 502 fapi sent in place of a response.

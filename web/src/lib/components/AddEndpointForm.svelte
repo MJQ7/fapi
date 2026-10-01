@@ -32,6 +32,10 @@
 	/** The proxy choice meaning "no proxy: type any port". */
 	const noProxy = 'none';
 
+	// One choice per port that has proxies, showing the one that's on (see
+	// api.portProxy).
+	const portChoices = $derived(api.portProxies(proxies ?? []));
+
 	// The chosen proxy's port, as text because select values are text, or
 	// noProxy. null until the user chooses, so the default follows the
 	// proxies as they load: the proxy on the default port, or else the first.
@@ -39,7 +43,9 @@
 	const proxyChoice = $derived(
 		chosenProxy ??
 			String(
-				proxies?.find((proxy) => proxy.port === defaultPort)?.port ?? proxies?.[0]?.port ?? noProxy
+				portChoices.find((proxy) => proxy.port === defaultPort)?.port ??
+					portChoices[0]?.port ??
+					noProxy
 			)
 	);
 	const choosingProxy = $derived(proxies !== null && proxies.length > 0);
@@ -53,7 +59,7 @@
 	);
 	// The proxy on the chosen port, if it has one. Warn when it has none or
 	// it's off, but only when proxies are turned on; otherwise no port has one.
-	const portProxy = $derived(proxies?.find((proxy) => proxy.port === port));
+	const portProxy = $derived(proxies ? api.portProxy(proxies, port) : undefined);
 	const unproxied = $derived(proxies !== null && !portProxy?.enabled);
 	let method = $state<api.Method>('GET');
 	let path = $state('');
@@ -120,7 +126,7 @@
 								value={proxyChoice}
 								onchange={(event) => (chosenProxy = event.currentTarget.value)}
 							>
-								{#each proxies ?? [] as proxy (proxy.port)}
+								{#each portChoices as proxy (proxy.port)}
 									<NativeSelectOption value={String(proxy.port)}>
 										{proxy.port} → {proxy.realAPI}{proxy.enabled ? '' : ' (off)'}
 									</NativeSelectOption>

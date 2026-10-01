@@ -61,7 +61,7 @@
 		counts: api.TrafficCounts[];
 	};
 
-	// A chart for each proxy, then one for each other port that received
+	// A chart for each port with proxies, then one for each other port that received
 	// requests in the period (a port with endpoints but no proxy), so no
 	// traffic goes unshown.
 	const charts = $derived.by<Chart[]>(() => {
@@ -73,14 +73,18 @@
 		const countsFor = (port: number) =>
 			ports[port] ?? Array.from({ length: steps }, () => ({ received: 0, proxied: 0, sent: 0 }));
 
+		// A port with several proxies is described by the one that's on.
 		const proxies = app.proxies ?? [];
-		const charts: Chart[] = proxies.map((proxy) => ({
-			port: proxy.port,
-			title: `Port ${proxy.port}`,
-			description: `Proxy to ${proxy.realAPI}`,
-			off: !proxy.enabled,
-			counts: countsFor(proxy.port)
-		}));
+		const charts: Chart[] = api.portProxies(proxies).map((proxy) => {
+			const saved = proxies.filter((each) => each.port === proxy.port).length;
+			return {
+				port: proxy.port,
+				title: `Port ${proxy.port}`,
+				description: `Proxy to ${proxy.realAPI}${saved > 1 ? ` (${saved} saved)` : ''}`,
+				off: !proxy.enabled,
+				counts: countsFor(proxy.port)
+			};
+		});
 		const others = Object.keys(ports)
 			.map(Number)
 			.filter((port) => !proxies.some((proxy) => proxy.port === port))

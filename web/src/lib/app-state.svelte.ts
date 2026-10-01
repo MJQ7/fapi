@@ -10,7 +10,7 @@ const pollMilliseconds = 2000;
 
 class AppState {
 	settings = $state<api.Settings | null>(null);
-	data = $state<api.MocksData>({ enabled: true, mocks: [], upstreams: {} });
+	data = $state<api.MocksData>({ enabled: true, mocks: [], proxies: [] });
 	payloads = $state<api.Payload[]>([]);
 	requests = $state<api.LoggedRequest[]>([]);
 	error = $state('');
@@ -93,8 +93,12 @@ class AppState {
 		this.showErrors(api.setMockEnabled(id, enabled).then(this.loadMocks));
 	};
 
-	setUpstreamEnabled = (port: number, enabled: boolean) => {
-		this.showErrors(api.setUpstreamEnabled(port, enabled).then(this.loadMocks));
+	setProxyEnabled = (id: string, enabled: boolean) => {
+		this.showErrors(api.setProxyEnabled(id, enabled).then(this.loadMocks));
+	};
+
+	deleteProxy = (id: string) => {
+		this.showErrors(api.deleteProxy(id).then(this.loadMocks));
 	};
 
 	deleteMock = (id: string) => {

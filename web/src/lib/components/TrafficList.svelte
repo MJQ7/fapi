@@ -57,11 +57,8 @@
 	function describe(request: LoggedRequest): string {
 		switch (request.outcome) {
 			case 'proxied': {
-				// The proxy may have changed since; then only the port is known.
-				const proxy = proxies?.find((saved) => saved.port === request.port);
-				return proxy && proxy.upstreamPort === request.upstream
-					? `Proxied to ${proxy.realAPI}`
-					: `Proxied to port ${request.upstream}`;
+				const proxy = forwardedBy(request);
+				return proxy ? `Proxied to ${proxy.realAPI}` : `Proxied to port ${request.upstream}`;
 			}
 			case 'mocked': {
 				const mock = mocks.find((saved) => saved.id === request.mockId);
@@ -80,12 +77,24 @@
 	 * proxy has changed since, only the port is known.
 	 */
 	function responseSource(request: LoggedRequest): string {
-		const proxy = proxies?.find((saved) => saved.port === request.port);
-		if (!proxy || proxy.upstreamPort !== request.upstream) {
+		const proxy = forwardedBy(request);
+		if (!proxy) {
 			return `port ${request.upstream}`;
 		}
 		const url = new URL(proxy.realAPI);
 		return isThisMachine(url.hostname) ? `port ${request.upstream}` : url.host;
+	}
+
+	/**
+	 * The proxy that forwarded a request, if it's still saved and unchanged.
+	 * Requests logged before proxies had IDs are matched by their ports.
+	 */
+	function forwardedBy(request: LoggedRequest): Proxy | undefined {
+		return proxies?.find((saved) =>
+			request.proxyId
+				? saved.id === request.proxyId
+				: saved.port === request.port && saved.upstreamPort === request.upstream
+		);
 	}
 
 	/** Whether a host name, as URL.hostname writes it, means this machine. */
