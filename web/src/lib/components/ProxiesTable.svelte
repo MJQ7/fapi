@@ -1,7 +1,8 @@
 <!--
-  The saved proxies, one row per fapi port, in port order. Each has an on/off
-  switch; a proxy that's off is kept, but its port's unmatched requests get a
-  404 instead of being forwarded.
+  The saved proxies, in port order. Each has an on/off switch. Only one proxy
+  per port is on: turning one on turns the others on its port off (fapi does
+  that). A proxy that's off is kept; when none on its port is on, the port's
+  unmatched requests get a 404 instead of being forwarded.
 -->
 <script lang="ts">
 	import type { Proxy } from '$lib/api';
@@ -11,8 +12,8 @@
 
 	type Props = {
 		proxies: Proxy[];
-		onSetEnabled: (port: number, enabled: boolean) => void;
-		onDelete: (port: number) => void;
+		onSetEnabled: (id: string, enabled: boolean) => void;
+		onDelete: (id: string) => void;
 	};
 	let { proxies, onSetEnabled, onDelete }: Props = $props();
 </script>
@@ -27,19 +28,19 @@
 		</Table.Row>
 	</Table.Header>
 	<Table.Body>
-		{#each proxies as proxy (proxy.port)}
+		{#each proxies as proxy (proxy.id)}
 			<Table.Row class={proxy.enabled ? '' : 'text-muted-foreground'}>
 				<Table.Cell>
 					<Switch
 						checked={proxy.enabled}
-						onCheckedChange={(checked) => onSetEnabled(proxy.port, checked)}
-						aria-label="Proxy on port {proxy.port} on"
+						onCheckedChange={(checked) => onSetEnabled(proxy.id, checked)}
+						aria-label="Proxy from port {proxy.port} to {proxy.realAPI} on"
 					/>
 				</Table.Cell>
 				<Table.Cell>{proxy.port}</Table.Cell>
 				<Table.Cell class="break-all">{proxy.realAPI}</Table.Cell>
 				<Table.Cell class="text-right">
-					<Button variant="outline" size="sm" onclick={() => onDelete(proxy.port)}>Delete</Button>
+					<Button variant="outline" size="sm" onclick={() => onDelete(proxy.id)}>Delete</Button>
 				</Table.Cell>
 			</Table.Row>
 		{:else}

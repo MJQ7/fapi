@@ -68,6 +68,9 @@ func New(fapi *core.Core, version string, shutdown func(), settingsFile string, 
 	mux.HandleFunc("PUT /api/payloads/{id}", a.putPayload)
 	mux.HandleFunc("DELETE /api/payloads/{id}", a.deletePayload)
 
+	mux.HandleFunc("POST /api/proxies", requireFeature(features.PassThrough, "passThrough", a.postProxy))
+	mux.HandleFunc("DELETE /api/proxies/{id}", requireFeature(features.PassThrough, "passThrough", a.deleteProxy))
+	mux.HandleFunc("PUT /api/proxies/{id}/enabled", requireFeature(features.PassThrough, "passThrough", a.putProxyEnabled))
 	mux.HandleFunc("PUT /api/upstreams/{port}", requireFeature(features.PassThrough, "passThrough", a.putUpstream))
 	mux.HandleFunc("PUT /api/upstreams/{port}/enabled", requireFeature(features.PassThrough, "passThrough", a.putUpstreamEnabled))
 

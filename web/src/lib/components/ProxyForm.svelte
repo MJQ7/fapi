@@ -2,7 +2,7 @@
   The form for adding a proxy: a fapi port and the real API port its
   requests are forwarded to. The real API is on passThrough.host (usually
   this machine) unless "another host" is ticked and a host is entered.
-  Adding a port that already has a proxy changes where it forwards to.
+  The new proxy is turned on, and fapi turns off any other on its port.
 -->
 <script lang="ts">
 	import * as api from '$lib/api';
@@ -42,7 +42,7 @@
 
 		saving = true;
 		try {
-			await api.setUpstream(port, upstreamPort, otherHost ? host : '');
+			await api.addProxy(port, upstreamPort, otherHost ? host : '');
 			port = null;
 			upstreamPort = null;
 			otherHost = false;

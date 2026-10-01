@@ -21,11 +21,19 @@ export type NewMock = Omit<Mock, 'id' | 'disabled'>;
 export type MocksData = {
 	enabled: boolean;
 	mocks: Mock[];
-	upstreams: Record<string, number>; // fapi port -> real API port
-	/** fapi port -> real API host, for proxies not using passThrough.host. */
-	upstreamHosts?: Record<string, string>;
-	/** The fapi ports whose proxy is turned off. */
-	disabledUpstreams?: Record<string, boolean>;
+	proxies: SavedProxy[]; // in the order added
+};
+
+/**
+ * A proxy as fapi saves it (core.Proxy). A port can have several, but only
+ * one is on at a time.
+ */
+export type SavedProxy = {
+	id: string;
+	port: number; // the fapi port
+	upstreamPort: number; // the real API port
+	host?: string; // the real API host; missing for passThrough.host
+	disabled?: boolean; // true when off; missing when on
 };
 
 /** A saved response, offered when adding an endpoint. */
@@ -52,6 +60,7 @@ export type LoggedRequest = {
 	outcome: 'mocked' | 'proxied' | 'unmatched' | 'preflight';
 	mockId?: string;
 	upstream?: number;
+	proxyId?: string; // the proxy that forwarded it, when proxied
 	fromPort: number;
 	/**
 	 * What the sender got back: the real API's answer when proxied, otherwise
@@ -211,9 +220,9 @@ export async function setMockEnabled(id: string, enabled: boolean): Promise<void
 	await send('PUT', `/api/mocks/${encodeURIComponent(id)}/enabled`, { enabled });
 }
 
-/** Turns the proxy on a fapi port on or off. */
-export async function setUpstreamEnabled(port: number, enabled: boolean): Promise<void> {
-	await send('PUT', `/api/upstreams/${port}/enabled`, { enabled });
+/** Turns a proxy on or off. Turning one on turns the others on its port off. */
+export async function setProxyEnabled(id: string, enabled: boolean): Promise<void> {
+	await send('PUT', `/api/proxies/${encodeURIComponent(id)}/enabled`, { enabled });
 }
 
 export async function setEnabled(enabled: boolean): Promise<void> {
@@ -221,36 +230,59 @@ export async function setEnabled(enabled: boolean): Promise<void> {
 }
 
 /**
- * Sets the real API host and port for a fapi port. A null port removes the
- * proxy. An empty host means passThrough.host in fapi's settings; a host
- * starting with https:// is reached over HTTPS.
+ * Adds a proxy from a fapi port to the real API port on host, and turns it
+ * on, turning off any other proxy on its port. If the port already has a
+ * proxy to the same place, that one is turned on instead. An empty host
+ * means passThrough.host in fapi's settings; a host starting with https:// is
+ * reached over HTTPS.
  */
-export async function setUpstream(
-	port: number,
-	upstreamPort: number | null,
-	host = ''
-): Promise<void> {
-	await send('PUT', `/api/upstreams/${port}`, { upstreamPort, host });
+export function addProxy(port: number, upstreamPort: number, host = ''): Promise<SavedProxy> {
+	return send<SavedProxy>('POST', '/api/proxies', { port, upstreamPort, host });
+}
+
+export async function deleteProxy(id: string): Promise<void> {
+	await send('DELETE', `/api/proxies/${encodeURIComponent(id)}`);
 }
 
 /** A saved proxy: a fapi port, where its requests are forwarded to, and whether it's on. */
-export type Proxy = { port: number; upstreamPort: number; realAPI: string; enabled: boolean };
+export type Proxy = {
+	id: string;
+	port: number;
+	upstreamPort: number;
+	realAPI: string;
+	enabled: boolean;
+};
 
 /**
- * The saved proxies, in port order. defaultHost is passThrough.host in fapi's
- * settings: the host of proxies without one of their own.
+ * The saved proxies, in port order, and in the order added within a port.
+ * defaultHost is passThrough.host in fapi's settings: the host of proxies
+ * without one of their own.
  */
 export function listProxies(data: MocksData, defaultHost: string): Proxy[] {
-	const hosts = data.upstreamHosts ?? {};
-	const disabled = data.disabledUpstreams ?? {};
-	return Object.entries(data.upstreams)
-		.map(([port, upstreamPort]) => ({
-			port: Number(port),
-			upstreamPort,
-			realAPI: upstreamURL(hosts[port] || defaultHost, upstreamPort),
-			enabled: !disabled[port]
+	return data.proxies
+		.map((proxy) => ({
+			id: proxy.id,
+			port: proxy.port,
+			upstreamPort: proxy.upstreamPort,
+			realAPI: upstreamURL(proxy.host || defaultHost, proxy.upstreamPort),
+			enabled: !proxy.disabled
 		}))
 		.sort((a, b) => a.port - b.port);
+}
+
+/**
+ * The proxy to show for a port, which has several: the one that's on, or
+ * else the last one added. Undefined if the port has none.
+ */
+export function portProxy(proxies: Proxy[], port: number): Proxy | undefined {
+	const onPort = proxies.filter((proxy) => proxy.port === port);
+	return onPort.find((proxy) => proxy.enabled) ?? onPort.at(-1);
+}
+
+/** Each port's proxy to show (see portProxy), in port order. */
+export function portProxies(proxies: Proxy[]): Proxy[] {
+	const ports = [...new Set(proxies.map((proxy) => proxy.port))];
+	return ports.map((port) => portProxy(proxies, port)!);
 }
 
 /**

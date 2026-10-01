@@ -8,8 +8,9 @@ import (
 
 // upstream is where a fapi port's unmatched requests are forwarded to.
 type upstream struct {
-	port int    // the real API port; 0 means don't forward
-	host string // the real API host, or "" for passThrough.host in fapi's settings
+	port    int    // the real API port; 0 means don't forward
+	host    string // the real API host, or "" for passThrough.host in fapi's settings
+	proxyID string // the proxy forwarding them
 }
 
 // upstreamURL returns the start of the URL requests are forwarded to, such

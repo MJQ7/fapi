@@ -30,6 +30,7 @@ type LoggedRequest struct {
 	Outcome  string `json:"outcome"`            // mocked, proxied, unmatched or preflight
 	MockID   string `json:"mockId,omitempty"`   // the endpoint that answered, when mocked
 	Upstream int    `json:"upstream,omitempty"` // the real API port, when proxied
+	ProxyID  string `json:"proxyId,omitempty"`  // the proxy that forwarded it
 	FromPort int    `json:"fromPort"`           // the sender's port; the address is assumed to be localhost
 
 	// Response is what the client was sent: the real API's answer when
