@@ -12,8 +12,8 @@
 #
 # Every edition has the mock servers and the admin API. Each edition is
 # released for amd64 only, as a Windows .zip holding the .exe, a .deb for
-# Debian/Ubuntu and an .rpm for Fedora/RHEL, plus one Docker image
-# (fapi-web). Other systems, such as macOS or ARM machines, build from
+# Debian/Ubuntu, an .rpm for Fedora/RHEL and a .pkg.tar.zst for Arch Linux,
+# plus one Docker image (fapi-web). Other systems, such as macOS or ARM machines, build from
 # source; see "Building from source" in README.md.
 # Docs: https://goreleaser.com/customization/
 version: 2
@@ -61,7 +61,7 @@ builds:
 
 # Windows gets a .zip holding the .exe, such as fapi-web_1.2.0_windows_amd64.zip.
 # fapi finds its updates by these names (see internal/updates), so keep them.
-# Linux gets no archive ("none"): its downloads are the .deb and .rpm below.
+# Linux gets no archive ("none"): its downloads are the packages below.
 archives:
   - id: fapi
     ids: [fapi]
@@ -87,18 +87,22 @@ archives:
       - goos: windows
         formats: [zip]
 
-# One .deb and one .rpm per edition. Each installs fapi to /opt/fapi (with
-# /usr/bin/fapi linked to it) and the fapi systemd service, which it enables
-# and starts. They all install the same files, so only one edition can be
-# installed at a time ("conflicts"). The same scripts serve both formats;
-# they handle the different arguments dpkg and rpm pass them.
+# One .deb, one .rpm and one Arch Linux package (.pkg.tar.zst) per edition.
+# Each installs fapi to /opt/fapi (with /usr/bin/fapi linked to it) and the
+# fapi systemd service, which it enables and starts. They all install the
+# same files, so only one edition can be installed at a time ("conflicts").
+# The same scripts serve every format; they handle the different arguments
+# dpkg, rpm and pacman pass them. pacman runs neither the install nor the
+# remove scripts during an upgrade, only its own upgrade ones, so
+# postinstall.sh is its post-upgrade script too.
 #
 # They also install what lets fapi update itself from its web UI (see
 # internal/updates): /opt/fapi/install-type, saying which format fapi came
 # from, and fapi-update.path and fapi-update.service, which install the
 # update fapi downloads as root. fapi finds the update by its file name, so
 # the names (file_name_template) must stay the same from release to release,
-# such as fapi-web_1.2.0_linux_amd64.deb.
+# such as fapi-web_1.2.0_linux_amd64.deb or
+# fapi-web_1.2.0_linux_amd64.pkg.tar.zst.
 nfpms:
   - id: fapi
     ids: [fapi]
@@ -109,7 +113,7 @@ nfpms:
       maintainer: fapi maintainers
       homepage: https://github.com/MJQ7/fapi
       license: MIT
-      formats: [deb, rpm]
+      formats: [deb, rpm, archlinux]
       file_name_template: '{{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
       bindir: /opt/fapi
       contents:
@@ -137,6 +141,11 @@ nfpms:
           packager: rpm
           file_info:
             mode: 0644
+        - src: packaging/install-type-pacman
+          dst: /opt/fapi/install-type
+          packager: archlinux
+          file_info:
+            mode: 0644
         - src: /opt/fapi/fapi
           dst: /usr/bin/fapi
           type: symlink
@@ -144,6 +153,10 @@ nfpms:
         postinstall: packaging/postinstall.sh
         preremove: packaging/preremove.sh
         postremove: packaging/postremove.sh
+      archlinux:
+        packager: fapi maintainers
+        scripts:
+          postupgrade: packaging/postinstall.sh
 
   - id: fapi-web
     ids: [fapi-web]
@@ -180,9 +193,13 @@ dockers_v2:
       org.opencontainers.image.licenses: MIT
       org.opencontainers.image.source: https://github.com/MJQ7/fapi
 
-# A tag with a pre-release suffix, such as v1.1.0-rc.1, is published as a
+# Releases are created as drafts, holding every file and the changelog, so
+# release notes can be added before publishing it on GitHub. Until then,
+# only maintainers see it, and fapi doesn't offer it as an update. Once
+# published, a tag with a pre-release suffix, such as v1.1.0-rc.1, is a
 # GitHub pre-release; any other tag is a normal release, marked "latest".
 release:
+  draft: true
   prerelease: auto
 
 checksum:

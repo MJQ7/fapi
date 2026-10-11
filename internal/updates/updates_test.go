@@ -22,6 +22,7 @@ func TestAssetName(t *testing.T) {
 	cases := map[string]string{
 		InstallDeb:     "fapi-web_1.2.0_linux_amd64.deb",
 		InstallRPM:     "fapi-web_1.2.0_linux_amd64.rpm",
+		InstallPacman:  "fapi-web_1.2.0_linux_amd64.pkg.tar.zst",
 		InstallWindows: "fapi-web_1.2.0_windows_amd64.zip",
 		InstallDocker:  "",
 		InstallManual:  "",

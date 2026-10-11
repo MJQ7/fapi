@@ -6,7 +6,7 @@
 
   fapi itself downloads the update, on the machine it runs on (so a fapi in
   WSL saves it in WSL, not in Windows), checks it, and installs it where it
-  can: the .deb and .rpm through their root helper, and the Windows .exe by
+  can: the .deb, .rpm and Arch package through their root helper, and the Windows .exe by
   replacing itself. It then restarts, and this page reloads once the new
   version answers. Where it can't install, it downloads the update and
   shows the command that installs it. In Docker, it only says to update the
@@ -138,6 +138,9 @@
 				break;
 			case 'rpm':
 				parts.push('RPM package');
+				break;
+			case 'pacman':
+				parts.push('Arch Linux package');
 				break;
 			case 'docker':
 				return [...parts, 'Docker'].join(' · ');
