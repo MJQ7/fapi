@@ -91,7 +91,7 @@ func run(arguments []string) int {
 		}
 		return 0
 	case "apply-update":
-		// Not in the usage: only the .deb and .rpm's fapi-update service
+		// Not in the usage: only the Linux packages' fapi-update service
 		// runs it, as root (see update.go).
 		err := applyUpdate(arguments[1:])
 		if err != nil {

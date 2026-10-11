@@ -23,7 +23,7 @@ import (
 // only, such as "1.2.3".
 var releaseVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
-// ApplyRequest is the root helper for the .deb and .rpm: `fapi apply-update`,
+// ApplyRequest is the root helper for the Linux packages: `fapi apply-update`,
 // run as root by fapi-update.service when fapi writes updates/request.json in
 // the data folder dataDir (see packaging/fapi-update.path). It installs the
 // update fapi downloaded there, and writes updates/result.json. The package's
@@ -114,8 +114,8 @@ func install(ctx context.Context, root *os.Root, version string, current string,
 
 	contents, err := os.ReadFile(installTypeFile)
 	kind := strings.TrimSpace(string(contents))
-	if err != nil || (kind != InstallDeb && kind != InstallRPM) {
-		return fmt.Errorf("%s doesn't say whether fapi came from a .deb or an .rpm", installTypeFile)
+	if err != nil || !isPackageType(kind) {
+		return fmt.Errorf("%s doesn't say whether fapi came from a .deb, an .rpm or an Arch package", installTypeFile)
 	}
 
 	name := AssetName(packageName, version, kind)
@@ -141,11 +141,14 @@ func install(ctx context.Context, root *os.Root, version string, current string,
 	_ = root.Remove(path.Join(updatesFolder, name)) // the copy is installed instead
 
 	var command *exec.Cmd
-	if kind == InstallDeb {
+	switch kind {
+	case InstallDeb:
 		command = exec.CommandContext(ctx, "dpkg", "--install", packagePath)
 		command.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
-	} else {
+	case InstallRPM:
 		command = exec.CommandContext(ctx, "rpm", "--upgrade", packagePath)
+	default:
+		command = exec.CommandContext(ctx, "pacman", "--upgrade", "--noconfirm", packagePath)
 	}
 	output, err := command.CombinedOutput()
 	log.Printf("%s:\n%s", strings.Join(command.Args, " "), output)

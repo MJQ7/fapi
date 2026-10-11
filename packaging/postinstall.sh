@@ -1,5 +1,5 @@
 #!/bin/sh
-# Run by the .deb and .rpm after installing or upgrading fapi:
+# Run by the .deb, .rpm and Arch package after installing or upgrading fapi:
 # enable the service and (re)start it, so an upgrade runs the new version,
 # and turn on fapi-update.path, which installs updates fapi downloads.
 # Skipped where there's no systemd, such as in most containers.

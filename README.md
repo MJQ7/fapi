@@ -21,6 +21,7 @@ It's one executable with a web UI and a terminal UI, and everything runs and sta
 | Windows | Download the `.zip`, unzip it and put `fapi.exe` on your `PATH`. The first time, SmartScreen warns that it's unsigned: click **More info**, then **Run anyway**. |
 | Debian, Ubuntu | `sudo apt install ./fapi_*.*.*_linux_amd64.deb`. This also installs and starts the `fapi` service. |
 | Fedora, RHEL | `sudo dnf install ./fapi_*.*.*_linux_amd64.rpm`. This also installs and starts the `fapi` service. |
+| Arch Linux | `sudo pacman -U ./fapi_*.*.*_linux_amd64.pkg.tar.zst`. This also installs and starts the `fapi` service. |
 | Docker | See [Docker](#docker). |
 | Anything else | [Build it from source](#building-from-source). |
 
@@ -34,7 +35,7 @@ Releases come in three editions, which differ only in their user interfaces:
 
 ## Run
 
-With the `.deb` or `.rpm`, fapi already runs as a service, so just open the web UI or run `fapi`.
+With a Linux package (`.deb`, `.rpm` or Arch `.pkg.tar.zst`), fapi already runs as a service, so just open the web UI or run `fapi`.
 
 ```bash
 fapi serve     # run fapi; the web UI is at http://127.0.0.1:3100
@@ -70,13 +71,13 @@ Your endpoints and payloads are saved in `mocks.json`, in fapi's data folder: `~
 
 ## The Linux service
 
-The `.deb` and `.rpm` install fapi to `/opt/fapi` and run it as the `fapi` systemd service:
+The Linux packages install fapi to `/opt/fapi` and run it as the `fapi` systemd service:
 
 ```bash
 systemctl status fapi
 sudo systemctl restart fapi
 journalctl -u fapi
-sudo apt remove fapi
+sudo apt remove fapi     # or: sudo dnf remove fapi, sudo pacman -R fapi
 ```
 
 Uninstalling keeps your endpoints in `/var/lib/fapi`.
@@ -87,11 +88,11 @@ The web UI's **Settings** screen says when there's a newer release, and shows ho
 
 | Installed from | What happens |
 |---|---|
-| `.deb`, `.rpm` | fapi downloads the package into `/var/lib/fapi/updates` and checks it against the release's checksums. The `fapi-update` helper, which the package installs, then installs it as root and restarts the service. Its log: `journalctl -u fapi-update`. |
+| `.deb`, `.rpm`, Arch package | fapi downloads the package into `/var/lib/fapi/updates` and checks it against the release's checksums. The `fapi-update` helper, which the package installs, then installs it as root and restarts the service. Its log: `journalctl -u fapi-update`. |
 | Windows `.zip` | fapi downloads the zip, replaces `fapi.exe` and starts again with the same options. If it was running in a console window, the window closes and fapi carries on in the background. |
 | Docker | Update the container to the new image. |
 
-The download happens on the machine fapi runs on, not in your browser, so a fapi in WSL is updated in WSL. When fapi can't install the update itself (a package fapi isn't running as the service, say, or a `fapi.exe` in a folder it can't change), **Download** saves it and shows the command that installs it. Anything else, such as a build from source, is updated the way you installed it. To install a package by hand instead, use `sudo apt install` or `sudo dnf install` as above; the service restarts by itself.
+The download happens on the machine fapi runs on, not in your browser, so a fapi in WSL is updated in WSL. When fapi can't install the update itself (a package fapi isn't running as the service, say, or a `fapi.exe` in a folder it can't change), **Download** saves it and shows the command that installs it. Anything else, such as a build from source, is updated the way you installed it. To install a package by hand instead, use `sudo apt install`, `sudo dnf install` or `sudo pacman -U` as above; the service restarts by itself.
 
 Installing updates can be turned off with the `installUpdates` setting (see [docs/configuration.md](docs/configuration.md#feature-flags)).
 

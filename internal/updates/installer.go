@@ -22,7 +22,7 @@ import (
 // when an update starts.
 const (
 	updatesFolder = "updates"
-	// requestFile asks the .deb or .rpm's root helper to install an update
+	// requestFile asks the Linux package's root helper to install an update
 	// (see apply.go and packaging/fapi-update.path).
 	requestFile = "request.json"
 	// resultFile says how the last install went. The helper writes it, or
@@ -380,6 +380,8 @@ func installCommand(installType string, path string) string {
 		return "sudo apt install " + path
 	case InstallRPM:
 		return "sudo dnf install " + path
+	case InstallPacman:
+		return "sudo pacman -U " + path
 	default:
 		return ""
 	}

@@ -129,7 +129,7 @@ export type UpdateCheck = {
 
 /** How the running fapi was installed, and whether it can update itself. */
 export type Installation = {
-	type: 'deb' | 'rpm' | 'windows' | 'docker' | 'manual';
+	type: 'deb' | 'rpm' | 'pacman' | 'windows' | 'docker' | 'manual';
 	package: string; // the edition: fapi, fapi-web or fapi-cli
 	os: string; // as Go names it, such as "linux" or "windows"
 	arch: string; // such as "amd64"

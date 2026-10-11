@@ -12,13 +12,15 @@ import (
 const (
 	InstallDeb     = "deb"     // the .deb, running as the fapi service
 	InstallRPM     = "rpm"     // the .rpm, running as the fapi service
+	InstallPacman  = "pacman"  // the Arch Linux package, running as the fapi service
 	InstallWindows = "windows" // the .exe from a release's .zip
 	InstallDocker  = "docker"  // the Docker image: updated by updating the container
 	InstallManual  = "manual"  // anything else, such as a build from source
 )
 
-// Files the .deb and .rpm install (see .goreleaser.yaml). install-type holds
-// "deb" or "rpm", so fapi knows which kind of package it came from.
+// Files the Linux packages install (see .goreleaser.yaml). install-type
+// holds "deb", "rpm" or "pacman", so fapi knows which kind of package it came
+// from.
 const (
 	packagedExecutable = "/opt/fapi/fapi"
 	installTypeFile    = "/opt/fapi/install-type"
@@ -92,16 +94,16 @@ func Detect(packageName string, executable string, allowed bool) Installation {
 	return installation
 }
 
-// detectPackage fills in installation for a Linux fapi installed from a .deb
-// or .rpm. It can install updates itself when it runs as the fapi service
+// detectPackage fills in installation for a Linux fapi installed from a .deb,
+// .rpm or Arch package. It can install updates itself when it runs as the fapi service
 // and the package's update helper (fapi-update.path) is there to run the
 // installer as root.
 func detectPackage(installation *Installation) {
 	contents, err := os.ReadFile(installTypeFile)
 	packaged := err == nil && installation.executable == packagedExecutable
 	kind := strings.TrimSpace(string(contents))
-	if !packaged || (kind != InstallDeb && kind != InstallRPM) {
-		installation.Reason = "This copy of fapi wasn't installed from a .deb or .rpm, so update it the way you installed it."
+	if !packaged || !isPackageType(kind) {
+		installation.Reason = "This copy of fapi wasn't installed from a .deb, .rpm or Arch package, so update it the way you installed it."
 		return
 	}
 
@@ -120,6 +122,11 @@ func detectPackage(installation *Installation) {
 	}
 }
 
+// isPackageType reports whether installType is one of the Linux packages.
+func isPackageType(installType string) bool {
+	return installType == InstallDeb || installType == InstallRPM || installType == InstallPacman
+}
+
 // AssetName returns the name of the release file with version of the
 // edition packageName for an install type, such as
 // "fapi-web_1.2.0_linux_amd64.deb", or "" if there's none. The names are set
@@ -128,6 +135,8 @@ func AssetName(packageName string, version string, installType string) string {
 	switch installType {
 	case InstallDeb, InstallRPM:
 		return fmt.Sprintf("%s_%s_linux_amd64.%s", packageName, version, installType)
+	case InstallPacman:
+		return fmt.Sprintf("%s_%s_linux_amd64.pkg.tar.zst", packageName, version)
 	case InstallWindows:
 		return fmt.Sprintf("%s_%s_windows_amd64.zip", packageName, version)
 	default:

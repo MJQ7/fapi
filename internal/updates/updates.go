@@ -5,7 +5,7 @@
 //
 // How an update is installed depends on how fapi was (install.go): the
 // Installer (installer.go) downloads it on the machine fapi runs on, checks
-// it, then replaces fapi.exe on Windows, or asks the .deb or .rpm's root
+// it, then replaces fapi.exe on Windows, or asks the Linux package's root
 // helper to install the package (apply.go).
 package updates
 
